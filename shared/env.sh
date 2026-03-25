@@ -46,6 +46,11 @@ get_mem_avail() {
     awk '/MemAvailable/ {printf "%.1fGB", $2/1024/1024}' /proc/meminfo
 }
 
+# Datestamp for output filenames (YYYYMMDD-HHMMSS)
+datestamp() {
+    date +%Y%m%d-%H%M%S
+}
+
 # Get GPU memory usage (returns "N/A" if nvidia-smi unavailable)
 get_gpu_mem() {
     nvidia-smi --query-gpu=memory.used,memory.total \
