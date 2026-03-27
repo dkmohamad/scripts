@@ -34,7 +34,7 @@ Each tool has its own `env.sh` for tool-specific configuration.
 Clone with submodules:
 
 ```bash
-git clone --recurse-submodules git@github.com:casomoltd/scripts.git
+git clone --recurse-submodules git@github.com:dkmohamad/scripts.git
 ```
 
 See individual tool READMEs for setup instructions.
