@@ -11,7 +11,7 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
-AUDIO_EXTS=(wav ogg m4a mp3 opus flac)
+AUDIO_EXTS=(wav ogg m4a mp3 opus flac mp4)
 
 # Collect files matching extensions from a directory.
 # Sets FILES array in caller's scope. Exits with error if dir
