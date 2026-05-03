@@ -28,7 +28,7 @@ WHISPER_TIMEOUT=30
 
 # xdotool typing delay (ms between keystrokes). Higher values prevent crashes
 # in some terminal apps (e.g., Claude CLI's React UI with rapid input).
-XDOTOOL_DELAY=20
+XDOTOOL_DELAY=5
 
 # Whisper paths
 WHISPER_BIN="$VENDOR_DIR/whisper.cpp/build/bin/whisper-cli"

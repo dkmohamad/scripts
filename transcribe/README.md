@@ -1,16 +1,24 @@
 # Push-to-Talk Voice Transcription
 
-Hold hotkey → speak → release → text appears.
+Hold hotkey -> speak -> release -> text appears.
 
 ## Requirements
 
 ```bash
-sudo apt install -y build-essential cmake make git alsa-utils xdotool xbindkeys
+sudo apt install -y build-essential cmake make git alsa-utils xdotool
 ```
 
 ## Setup
 
-### 1. Build whisper.cpp
+### 1. Install Python dependencies
+
+```bash
+cd transcribe
+uv venv
+uv pip install evdev
+```
+
+### 2. Build whisper.cpp
 
 ```bash
 cd vendor/whisper.cpp
@@ -23,7 +31,7 @@ sudo apt install nvidia-cuda-toolkit
 cmake -B build -DGGML_CUDA=ON && cmake --build build -j$(nproc)
 ```
 
-### 2. Download models
+### 3. Download models
 
 ```bash
 cd vendor/whisper.cpp/models
@@ -31,49 +39,51 @@ cd vendor/whisper.cpp/models
 ./download-vad-model.sh silero-v6.2.0
 ```
 
-Whisper options: `tiny.en` (fast) → `base.en` → `small.en` → `medium.en` → `large` (accurate)
+Whisper options: `tiny.en` (fast) -> `base.en` -> `small.en` ->
+`medium.en` -> `large` (accurate)
 
-VAD (Voice Activity Detection) filters trailing silence to prevent hallucinations like "you" or "Thank you for watching".
+VAD (Voice Activity Detection) filters trailing silence to prevent
+hallucinations like "you" or "Thank you for watching".
 
-### 3. Configure hotkey
+### 4. Add user to input group
+
+The evdev daemon reads `/dev/input/*` directly, which requires the
+`input` group. Add your user and re-login:
 
 ```bash
-cp transcribe/xbindkeysrc.template ~/.xbindkeysrc
-xbindkeys          # Start daemon
+sudo usermod -aG input $USER
+# Log out and back in for the group change to take effect
 ```
 
-### 4. Disable key repeat for Menu key
+Verify after re-login:
 
-The Menu key (keycode 135) must have auto-repeat disabled to prevent rapid-fire
-hotkey events when held. Two methods ensure this persists:
-
-**User-level (X session start):**
 ```bash
-cat >> ~/.xsessionrc << 'EOF'
-# Disable key repeat for Menu key (PTT hotkey)
-xset -r 135
-EOF
+groups | grep input
 ```
 
-**System-level (keyboard hotplug):**
+### 5. Start the PTT daemon
+
 ```bash
-sudo tee /etc/udev/rules.d/99-ptt-keyboard.rules << 'EOF'
-ACTION=="add", SUBSYSTEM=="input", ENV{ID_INPUT_KEYBOARD}=="1", RUN+="/usr/bin/xset -r 135"
-EOF
-sudo udevadm control --reload-rules
+./transcribe/ptt-setup.sh
 ```
 
-The udev rule handles keyboard replug; xsessionrc handles login/unlock.
+This kills any stale processes and starts the evdev PTT daemon in
+the background. The daemon monitors all keyboards for Ctrl+Menu
+press/release and calls `ptt-start.sh` / `ptt-stop.sh`.
 
-### 5. Autostart
+### 6. Autostart
 
-xbindkeys auto-starts via `/etc/xdg/autostart/xbindkeys.desktop`.
+Add to your desktop session autostart (e.g. `~/.xsessionrc`):
+
+```bash
+/path/to/scripts/transcribe/ptt-setup.sh
+```
 
 ## Usage
 
 1. Focus target window
 2. Hold `Ctrl+Menu` and speak
-3. Release → text typed
+3. Release -> text typed
 
 ## Troubleshooting
 
@@ -88,22 +98,25 @@ aplay /tmp/whisper_ptt.wav                     # Mic working?
 
 **Hotkey not triggering:**
 ```bash
-pgrep xbindkeys    # Running?
-xbindkeys -k       # Test key detection
-pkill sxhkd        # Kill conflicting daemons
+# Test evdev key detection
+./transcribe/.venv/bin/python ./transcribe/ptt-evdev.py --test
+
+# Check the daemon is running
+pgrep -f ptt-evdev
+
+# Restart the daemon
+./transcribe/ptt-setup.sh
 ```
 
-**Hotkey stopped working after keyboard replug:**
-`xbindkeys` grabs keys on the original keyboard device. After replugging, it holds stale references. Run the setup script to kill stale processes and restart:
-
+**Permission denied on /dev/input:**
 ```bash
-./transcribe/ptt-setup.sh
+groups | grep input     # Are you in the input group?
+# If not: sudo usermod -aG input $USER, then log out and back in
 ```
 
 **Empty recordings (rapid start/stop in logs):**
 ```bash
 journalctl -t whisper-ptt -p err --since "5 min ago"
-xset -r 135        # Immediate fix; see step 4 for persistent setup
 ```
 
 ## Logs
@@ -129,7 +142,8 @@ STOP duration=0.1s size=128B (recording empty - no audio captured)
 
 ## Known Issues
 
-**CUDA crashes with rapid triggers:** Lock file prevents concurrent whisper processes. 30s timeout kills hung transcriptions.
+**CUDA crashes with rapid triggers:** Lock file prevents concurrent
+whisper processes. 30s timeout kills hung transcriptions.
 
 ```bash
 journalctl -b -1 | grep -i "whisper\|coredump"    # Check past crashes
