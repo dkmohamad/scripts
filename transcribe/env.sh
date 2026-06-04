@@ -33,12 +33,21 @@ XDOTOOL_DELAY=5
 # Whisper paths
 WHISPER_BIN="$VENDOR_DIR/whisper.cpp/build/bin/whisper-cli"
 WHISPER_MODEL="$VENDOR_DIR/whisper.cpp/models/ggml-base.en.bin"
+WHISPER_MODEL_MULTI="$VENDOR_DIR/whisper.cpp/models/ggml-medium.bin"
 VAD_MODEL="$VENDOR_DIR/whisper.cpp/models/ggml-silero-v6.2.0.bin"
 
 # Transcribe a WAV file with whisper.cpp. Raw output on stdout.
 whisper_transcribe() {
     "$WHISPER_BIN" \
         -m "$WHISPER_MODEL" -f "$1" -np -nt -sns \
+        --vad -vm "$VAD_MODEL" 2>/dev/null
+}
+
+# Transcribe a WAV file with the multilingual model (auto-detects language).
+whisper_transcribe_multi() {
+    "$WHISPER_BIN" \
+        -m "$WHISPER_MODEL_MULTI" -f "$1" -np -nt -sns \
+        --language auto \
         --vad -vm "$VAD_MODEL" 2>/dev/null
 }
 

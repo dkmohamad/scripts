@@ -5,11 +5,17 @@
 # to 16kHz mono WAV first, then all wav files are transcribed.
 # Output is written to a timestamped file in the current directory.
 #
-# Usage: ./transcribe/transcribe.sh <directory>
+# Usage: ./transcribe/transcribe.sh [--babel] <directory>
 
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+
+BABEL=false
+if [[ "${1:-}" == "--babel" ]]; then
+    BABEL=true
+    shift
+fi
 
 AUDIO_EXTS=(wav ogg m4a mp3 opus flac mp4)
 
@@ -55,8 +61,11 @@ preprocess() {
 
 # Transcribe a wav file, returning cleaned text on stdout.
 transcribe() {
-    whisper_transcribe "$1" \
-        | tr '\n' ' ' | tr -s ' ' | sed 's/^ *//; s/ *$//'
+    if $BABEL; then
+        whisper_transcribe_multi "$1"
+    else
+        whisper_transcribe "$1"
+    fi | tr '\n' ' ' | tr -s ' ' | sed 's/^ *//; s/ *$//'
 }
 
 if [ $# -lt 1 ]; then
