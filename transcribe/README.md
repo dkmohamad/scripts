@@ -35,12 +35,13 @@ cmake -B build -DGGML_CUDA=ON && cmake --build build -j$(nproc)
 
 ```bash
 cd vendor/whisper.cpp/models
-./download-ggml-model.sh base.en
+./download-ggml-model.sh base.en      # English PTT
+./download-ggml-model.sh large-v3     # Multilingual (--babel mode)
 ./download-vad-model.sh silero-v6.2.0
 ```
 
 Whisper options: `tiny.en` (fast) -> `base.en` -> `small.en` ->
-`medium.en` -> `large` (accurate)
+`medium.en` -> `large-v3` (accurate, multilingual)
 
 VAD (Voice Activity Detection) filters trailing silence to prevent
 hallucinations like "you" or "Thank you for watching".
@@ -112,6 +113,12 @@ pgrep -f ptt-evdev
 ```bash
 groups | grep input     # Are you in the input group?
 # If not: sudo usermod -aG input $USER, then log out and back in
+```
+
+**Empty output (whisper error):**
+Whisper stderr is logged to the journal. Check for errors:
+```bash
+journalctl -t whisper-ptt -p err --since "5 min ago"
 ```
 
 **Empty recordings (rapid start/stop in logs):**

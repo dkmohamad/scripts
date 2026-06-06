@@ -1,21 +1,38 @@
 #!/usr/bin/env bash
 # transcribe.sh - Batch transcribe audio files with whisper.cpp
 #
-# Accepts a directory of audio files. Non-wav files are converted
-# to 16kHz mono WAV first, then all wav files are transcribed.
-# Output is written to a timestamped file in the current directory.
+# Accepts a directory or individual files. Non-wav files are converted
+# to 16kHz mono WAV first, then transcribed.
 #
-# Usage: ./transcribe/transcribe.sh [--babel] <directory>
+# Usage:
+#   transcribe.sh [options] <directory>
+#   transcribe.sh [options] <file> [file...]
+#
+# Options:
+#   --babel  Use the multilingual model (auto-detects language)
+#   --csv    Output per-file CSV with timestamps (start,end,text)
+#            instead of a single merged plain-text file
+#
+# Examples:
+#   transcribe.sh ~/audio              # all files in dir -> .txt
+#   transcribe.sh --babel ~/audio      # multilingual
+#   transcribe.sh --csv file1.wav      # single file -> file1.csv
+#   transcribe.sh --csv a.wav b.wav    # two files -> a.csv, b.csv
 
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 BABEL=false
-if [[ "${1:-}" == "--babel" ]]; then
-    BABEL=true
+CSV=false
+while [[ "${1:-}" == --* ]]; do
+    case "$1" in
+        --babel) BABEL=true ;;
+        --csv)   CSV=true ;;
+        *) echo "Unknown flag: $1" >&2; exit 1 ;;
+    esac
     shift
-fi
+done
 
 AUDIO_EXTS=(wav ogg m4a mp3 opus flac mp4)
 
@@ -68,42 +85,88 @@ transcribe() {
     fi | tr '\n' ' ' | tr -s ' ' | sed 's/^ *//; s/ *$//'
 }
 
+# Transcribe a wav file to CSV with timestamps.
+# Writes <output_base>.csv via whisper-cli -ocsv.
+transcribe_csv() {
+    local input="$1" output_base="$2"
+    local model="$WHISPER_MODEL"
+    local extra_args=()
+    if $BABEL; then
+        model="$WHISPER_MODEL_MULTI"
+        extra_args=(--language auto -mc 0)
+    fi
+    "$WHISPER_BIN" \
+        -m "$model" -f "$input" -np -sns \
+        --vad -vm "$VAD_MODEL" \
+        "${extra_args[@]}" \
+        -ocsv -of "$output_base" \
+        2> >(logger -t "$LOG_TAG" -p user.err)
+}
+
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 <directory>" >&2
+    echo "Usage: $0 <dir|file...>" >&2
     exit 1
 fi
 
-collect_files "$1" "${AUDIO_EXTS[@]}"
+if [ -d "$1" ]; then
+    collect_files "$1" "${AUDIO_EXTS[@]}"
+else
+    FILES=("$@")
+    for f in "${FILES[@]}"; do
+        if [ ! -f "$f" ]; then
+            echo "Error: '$f' not found" >&2
+            exit 1
+        fi
+    done
+fi
 
 TMPWAV=$(mktemp /tmp/transcribe_XXXXXX.wav)
 trap 'rm -f "$TMPWAV"' EXIT
 
-OUTPUT="transcriptions-$(datestamp).txt"
-
 echo "Transcribing ${#FILES[@]} files..." >&2
 
-for f in "${FILES[@]}"; do
-    name=$(basename "$f")
+if $CSV; then
+    for f in "${FILES[@]}"; do
+        name=$(basename "$f")
 
-    if [[ "$f" == *.wav ]]; then
-        wav="$f"
-    else
-        if ! preprocess "$f" "$TMPWAV"; then
-            echo "  $name (skipped, not audio)" >&2
-            continue
+        if [[ "$f" == *.wav ]]; then
+            wav="$f"
+        else
+            if ! preprocess "$f" "$TMPWAV"; then
+                echo "  $name (skipped, not audio)" >&2
+                continue
+            fi
+            wav="$TMPWAV"
         fi
-        wav="$TMPWAV"
-    fi
 
-    text=$(transcribe "$wav")
+        output_base="${f%.*}"
+        transcribe_csv "$wav" "$output_base"
+        echo "  $name -> $(basename "$output_base").csv" >&2
+    done
+else
+    OUTPUT="transcriptions-$(datestamp).txt"
 
-    echo "$name"
-    echo "$text"
-    echo
+    for f in "${FILES[@]}"; do
+        name=$(basename "$f")
 
-    echo "  $name" >&2
-# stdout from the loop body is redirected to the output file;
-# stderr (progress lines) still prints to the terminal.
-done > "$OUTPUT"
+        if [[ "$f" == *.wav ]]; then
+            wav="$f"
+        else
+            if ! preprocess "$f" "$TMPWAV"; then
+                echo "  $name (skipped, not audio)" >&2
+                continue
+            fi
+            wav="$TMPWAV"
+        fi
 
-echo "Wrote $OUTPUT" >&2
+        text=$(transcribe "$wav")
+
+        echo "$name"
+        echo "$text"
+        echo
+
+        echo "  $name" >&2
+    done > "$OUTPUT"
+
+    echo "Wrote $OUTPUT" >&2
+fi
