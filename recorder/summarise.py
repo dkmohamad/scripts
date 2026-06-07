@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarise a meeting transcript using Claude Haiku.
+"""Summarise a transcript using Claude Haiku.
 
 Sends the transcript to the Anthropic Messages API and writes a
 structured summary (key points, decisions, action items).
@@ -23,17 +23,18 @@ from recorder.lib import (
 )
 
 SYSTEM_PROMPT = (
-    "You are a meeting notes assistant. Given a transcript, "
-    "produce a concise summary with these sections:\n\n"
-    "## Key Discussion Points\n"
-    "- Bullet the main topics discussed.\n\n"
+    "You are a note-taking assistant. Given a transcript "
+    "(which may be a multi-person meeting or a solo voice note), "
+    "produce a concise summary.\n\n"
+    "Use whichever of these sections are relevant:\n\n"
+    "## Key Points\n"
+    "- Bullet the main topics or ideas.\n\n"
     "## Decisions Made\n"
-    "- List any decisions reached during the meeting.\n\n"
+    "- List any decisions reached.\n\n"
     "## Action Items\n"
-    "- List action items. Include the owner's name where "
-    "mentioned.\n\n"
-    "Be concise. Omit filler, small talk, and repeated content. "
-    "If a section has no items, omit it."
+    "- List action items with owners where mentioned.\n\n"
+    "Omit sections that have no items. "
+    "Be concise. Omit filler, small talk, and repeated content."
 )
 
 MODEL = SUMMARY_MODEL

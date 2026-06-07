@@ -1,13 +1,12 @@
 # Meeting Recorder
 
-Record calls and solo voice notes, transcribe with whisper.cpp
+Record calls (mic + system audio), transcribe with whisper.cpp
 (large-v3), and summarise with Claude Haiku 4.5 via the Anthropic API.
 
 ## Pipeline
 
 ```bash
-capture start              # mic + system audio
-capture start --solo       # mic only
+capture start              # mic + system audio (dual-track)
 capture status             # check recording
 capture stop               # stop + transcribe + summarise + compress
 capture stop --skip-summary
@@ -24,13 +23,9 @@ Each recording creates its own session directory:
 
 ```
 ~/Recordings/
-├── meeting-20260607-143000/
-│   ├── mic.mp3
-│   ├── system.mp3
-│   ├── transcript.txt
-│   └── summary.txt
-└── note-20260607-160000/
+└── meeting-20260607-143000/
     ├── mic.mp3
+    ├── system.mp3
     ├── transcript.txt
     └── summary.txt
 ```
@@ -63,7 +58,6 @@ uv sync
 | `lib.py` | Shared utilities for Python scripts |
 | `config` | Pipeline configuration (model, filenames) |
 | `_record_meeting.sh` | Internal: launch dual-track ffmpeg |
-| `_record_note.sh` | Internal: launch mic-only ffmpeg |
 | `_stop.sh` | Internal: stop ffmpeg processes |
 | `_compress.sh` | Internal: convert WAV to MP3 |
 

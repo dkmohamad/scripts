@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Transcribe a recording session.
 
-Given a session directory containing mic.wav (and optionally
-system.wav), produces a transcript.txt file. Dual-track sessions
-get speaker-labelled output; solo sessions get plain text.
+Given a session directory containing mic.wav and system.wav,
+produces a speaker-labelled transcript.txt file.
 
 Usage:
     transcribe.py <session_dir>
@@ -75,41 +74,39 @@ def transcribe_one(session_dir: Path) -> None:
     print(f"Transcribing {session_dir.name}...")
     log_info(f"Transcribing {session_dir}")
 
-    if sys_file.exists():
-        mic_csv = session_dir / "mic.csv"
-        sys_csv = session_dir / "system.csv"
-
-        subprocess.run(
-            [
-                str(TRANSCRIBE_SH),
-                "--babel",
-                "--csv",
-                str(mic_file),
-            ],
-            check=True,
+    if not sys_file.exists():
+        print(
+            f"Warning: no {SYS_FILE} in {session_dir}",
+            file=sys.stderr,
         )
-        subprocess.run(
-            [
-                str(TRANSCRIBE_SH),
-                "--babel",
-                "--csv",
-                str(sys_file),
-            ],
-            check=True,
-        )
+        sys.exit(1)
 
-        merge_csvs(mic_csv, sys_csv, transcript)
+    mic_csv = session_dir / "mic.csv"
+    sys_csv = session_dir / "system.csv"
 
-        mic_csv.unlink(missing_ok=True)
-        sys_csv.unlink(missing_ok=True)
-    else:
-        result = subprocess.run(
-            [str(TRANSCRIBE_SH), "--babel", str(mic_file)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        transcript.write_text(result.stdout)
+    subprocess.run(
+        [
+            str(TRANSCRIBE_SH),
+            "--babel",
+            "--csv",
+            str(mic_file),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            str(TRANSCRIBE_SH),
+            "--babel",
+            "--csv",
+            str(sys_file),
+        ],
+        check=True,
+    )
+
+    merge_csvs(mic_csv, sys_csv, transcript)
+
+    mic_csv.unlink(missing_ok=True)
+    sys_csv.unlink(missing_ok=True)
 
     line_count = len(transcript.read_text().splitlines())
     print(f"Wrote {transcript} ({line_count} lines)")

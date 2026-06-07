@@ -2,10 +2,10 @@
 """Unified capture CLI for the recorder pipeline.
 
 Manages the full lifecycle: start recording, check status, stop +
-transcribe + summarise.
+transcribe + summarise. Always records dual-track (mic + system).
 
 Usage:
-    capture.py start [--solo]
+    capture.py start
     capture.py status
     capture.py stop [--skip-summary] [--keep-wav]
 """
@@ -25,7 +25,6 @@ from recorder.lib import (
     MEETING_PREFIX,
     META_FILE,
     MIC_FILE,
-    NOTE_PREFIX,
     RECORDINGS_DIR,
     SYS_FILE,
     TRANSCRIPT_FILE,
@@ -100,18 +99,11 @@ def cmd_start(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    solo = args.solo
-    mode = "note" if solo else "meeting"
-    prefix = NOTE_PREFIX if solo else MEETING_PREFIX
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    session_dir = RECORDINGS_DIR / f"{prefix}-{ts}"
+    session_dir = RECORDINGS_DIR / f"{MEETING_PREFIX}-{ts}"
     session_dir.mkdir(parents=True, exist_ok=True)
 
-    script = (
-        RECORDER_DIR / "_record_note.sh"
-        if solo
-        else RECORDER_DIR / "_record_meeting.sh"
-    )
+    script = RECORDER_DIR / "_record_meeting.sh"
 
     result = subprocess.run(
         [
@@ -134,23 +126,17 @@ def cmd_start(args: argparse.Namespace) -> None:
 
     meta = {
         "MIC_PID": str(pids["mic_pid"]),
-        "SYS_PID": str(pids.get("sys_pid", "")),
+        "SYS_PID": str(pids["sys_pid"]),
         "START_EPOCH": str(int(time.time())),
-        "MODE": mode,
     }
     write_meta(session_dir, meta)
     ACTIVE_FILE.write_text(str(session_dir))
 
-    log_info(
-        f"Recording started: {session_dir.name} "
-        f"(mode={mode})"
-    )
+    log_info(f"Recording started: {session_dir.name}")
     print("Recording started.")
     print(f"  Session: {session_dir}")
-    print(f"  Mode:    {mode}")
     print(f"  Mic PID: {pids['mic_pid']}")
-    if "sys_pid" in pids:
-        print(f"  Sys PID: {pids['sys_pid']}")
+    print(f"  Sys PID: {pids['sys_pid']}")
     print(
         f"  Max duration: {MAX_DURATION_SECS // 60} min "
         "(auto-stop)"
@@ -167,7 +153,6 @@ def cmd_status(args: argparse.Namespace) -> None:
     now = int(time.time())
     start = int(meta["START_EPOCH"])
     duration = now - start
-    mode = meta.get("MODE", "unknown")
 
     mic_pid = int(meta["MIC_PID"])
     mic_alive = "dead"
@@ -181,7 +166,6 @@ def cmd_status(args: argparse.Namespace) -> None:
         f"Recording in progress: {human_duration(duration)}"
     )
     print(f"  Session: {session_dir}")
-    print(f"  Mode:    {mode}")
     print(f"  Mic:     pid {mic_pid} ({mic_alive})")
 
     sys_pid_str = meta.get("SYS_PID", "")
@@ -276,14 +260,7 @@ def main() -> None:
     )
     sub = parser.add_subparsers(dest="command")
 
-    p_start = sub.add_parser(
-        "start", help="Start recording"
-    )
-    p_start.add_argument(
-        "--solo",
-        action="store_true",
-        help="Mic-only (no system audio)",
-    )
+    sub.add_parser("start", help="Start recording")
 
     sub.add_parser("status", help="Check recording status")
 
