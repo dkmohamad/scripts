@@ -6,7 +6,8 @@ A collection of utility scripts for Linux.
 
 | Tool | Description |
 |------|-------------|
-| [transcribe](transcribe/) | Push-to-talk voice dictation using whisper.cpp |
+| [transcribe](transcribe/) | Push-to-talk voice dictation |
+| [recorder](recorder/) | Record, transcribe & summarise meetings |
 | [gdrive-mount](gdrive-mount/) | Mount Google Drive as FUSE filesystem via rclone |
 
 ## Structure
@@ -14,7 +15,8 @@ A collection of utility scripts for Linux.
 ```
 scripts/
 ├── shared/         # Common utilities (logging, helpers)
-├── transcribe/     # Voice-to-text tools
+├── transcribe/     # Push-to-talk voice dictation
+├── recorder/       # Meeting recording, transcription & summarisation
 ├── gdrive-mount/   # Google Drive mounting
 └── vendor/         # Third-party dependencies (submodules)
 ```
@@ -35,6 +37,19 @@ Clone with submodules:
 
 ```bash
 git clone --recurse-submodules git@github.com:dkmohamad/scripts.git
+```
+
+Install Python dependencies (requires [uv](https://docs.astral.sh/uv/)):
+
+```bash
+uv sync
+```
+
+Copy the environment template and fill in your keys:
+
+```bash
+cp .env.template .env
+# Edit .env with your API keys (gitignored, never committed)
 ```
 
 See individual tool READMEs for setup instructions.

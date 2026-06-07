@@ -1,6 +1,6 @@
-# Push-to-Talk Voice Transcription
+# Push-to-Talk Voice Dictation
 
-Hold hotkey -> speak -> release -> text appears.
+Voice dictation using whisper.cpp with a keyboard hotkey.
 
 ## Requirements
 
@@ -13,9 +13,7 @@ sudo apt install -y build-essential cmake make git alsa-utils xdotool
 ### 1. Install Python dependencies
 
 ```bash
-cd transcribe
-uv venv
-uv pip install evdev
+uv sync
 ```
 
 ### 2. Build whisper.cpp
@@ -35,13 +33,15 @@ cmake -B build -DGGML_CUDA=ON && cmake --build build -j$(nproc)
 
 ```bash
 cd vendor/whisper.cpp/models
-./download-ggml-model.sh base.en      # English PTT
-./download-ggml-model.sh large-v3     # Multilingual (--babel mode)
+./download-ggml-model.sh base.en      # English PTT (fast)
+./download-ggml-model.sh large-v3     # Meeting transcription
 ./download-vad-model.sh silero-v6.2.0
 ```
 
-Whisper options: `tiny.en` (fast) -> `base.en` -> `small.en` ->
-`medium.en` -> `large-v3` (accurate, multilingual)
+| Model | Used by | Notes |
+|-------|---------|-------|
+| `base.en` | Push-to-talk | Fast, English-only |
+| `large-v3` | Meeting transcription | Accurate, multilingual, fewer hallucinations |
 
 VAD (Voice Activity Detection) filters trailing silence to prevent
 hallucinations like "you" or "Thank you for watching".
@@ -100,7 +100,7 @@ aplay /tmp/whisper_ptt.wav                     # Mic working?
 **Hotkey not triggering:**
 ```bash
 # Test evdev key detection
-./transcribe/.venv/bin/python ./transcribe/ptt-evdev.py --test
+.venv/bin/python transcribe/ptt-evdev.py --test
 
 # Check the daemon is running
 pgrep -f ptt-evdev

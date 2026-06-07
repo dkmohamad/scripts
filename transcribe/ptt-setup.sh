@@ -14,7 +14,7 @@ pkill -f "ptt-evdev.py" 2>/dev/null
 rm -f "$LOCKFILE" "$TMP" "$TMP_TEXT"
 
 # Start evdev PTT daemon in background
-VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
+VENV_PYTHON="$SCRIPT_DIR/../.venv/bin/python"
 "$VENV_PYTHON" "$SCRIPT_DIR/ptt-evdev.py" &
 disown
 

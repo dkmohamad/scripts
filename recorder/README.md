@@ -1,0 +1,67 @@
+# Meeting Recorder
+
+Record calls and solo voice notes, transcribe with whisper.cpp
+(large-v3), and summarise with Claude Haiku 4.5 via the Anthropic API.
+
+## Pipeline
+
+```bash
+capture start              # mic + system audio
+capture start --solo       # mic only
+capture status             # check recording
+capture stop               # stop + transcribe + summarise
+capture stop --skip-summary
+```
+
+Stopping automatically transcribes and summarises. Recordings
+auto-stop after 90 minutes.
+
+## Output Structure
+
+Each recording creates its own session directory:
+
+```
+~/Recordings/
+├── meeting-20260607-143000/
+│   ├── mic.wav
+│   ├── system.wav
+│   ├── transcript.txt
+│   └── summary.txt
+└── note-20260607-160000/
+    ├── mic.wav
+    ├── transcript.txt
+    └── summary.txt
+```
+
+## Setup
+
+### Requirements
+
+- Python 3.12+ with a project-level venv (see root README)
+- `ffmpeg` and PulseAudio utilities for recording
+- whisper.cpp with the `large-v3` model (see `transcribe/README.md`)
+- An Anthropic API key
+
+```bash
+cp .env.template .env
+# Add your ANTHROPIC_API_KEY to .env
+uv sync
+```
+
+## Scripts
+
+| Script | Description |
+|--------|-------------|
+| `capture.py` | Main CLI: start/stop/status (console script: `capture`) |
+| `transcribe.py` | Transcribe a session directory |
+| `summarise.py` | Summarise transcript via Anthropic API |
+| `lib.py` | Shared utilities for Python scripts |
+| `config` | Pipeline configuration (model, filenames) |
+| `_record_meeting.sh` | Internal: launch dual-track ffmpeg |
+| `_record_note.sh` | Internal: launch mic-only ffmpeg |
+| `_stop.sh` | Internal: stop ffmpeg processes |
+
+## Cost
+
+The summariser uses the model set in `config` (~$0.007 per
+meeting). It outputs `summary.txt` alongside the transcript.
