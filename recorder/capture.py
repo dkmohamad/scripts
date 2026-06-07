@@ -7,7 +7,7 @@ transcribe + summarise.
 Usage:
     capture.py start [--solo]
     capture.py status
-    capture.py stop [--skip-summary]
+    capture.py stop [--skip-summary] [--keep-wav]
 """
 
 import argparse
@@ -33,6 +33,7 @@ from recorder.lib import (
 )
 
 RECORDER_DIR = Path(__file__).resolve().parent
+COMPRESS_SCRIPT = RECORDER_DIR / "_compress.sh"
 
 
 def human_duration(secs: int) -> str:
@@ -77,6 +78,16 @@ def get_active_session() -> Path | None:
     if path.is_dir() and (path / META_FILE).exists():
         return path
     return None
+
+
+def compress_session(
+    session_dir: Path, keep_wav: bool = False
+) -> None:
+    """Compress WAV files to MP3 after transcription."""
+    cmd = [str(COMPRESS_SCRIPT), str(session_dir)]
+    if keep_wav:
+        cmd.append("--keep-wav")
+    subprocess.run(cmd, check=False)
 
 
 def cmd_start(args: argparse.Namespace) -> None:
@@ -250,6 +261,11 @@ def cmd_stop(args: argparse.Namespace) -> None:
         print()
         print("Skipped summary (--skip-summary).")
 
+    # Compress WAV to MP3
+    print()
+    print("Compressing...")
+    compress_session(session_dir, keep_wav=args.keep_wav)
+
     print()
     print(f"All output in: {session_dir}")
 
@@ -278,6 +294,11 @@ def main() -> None:
         "--skip-summary",
         action="store_true",
         help="Skip summarisation after transcription",
+    )
+    p_stop.add_argument(
+        "--keep-wav",
+        action="store_true",
+        help="Keep original WAV files after MP3 compression",
     )
 
     args = parser.parse_args()

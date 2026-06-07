@@ -9,12 +9,14 @@ Record calls and solo voice notes, transcribe with whisper.cpp
 capture start              # mic + system audio
 capture start --solo       # mic only
 capture status             # check recording
-capture stop               # stop + transcribe + summarise
+capture stop               # stop + transcribe + summarise + compress
 capture stop --skip-summary
+capture stop --keep-wav    # keep original WAV files
 ```
 
-Stopping automatically transcribes and summarises. Recordings
-auto-stop after 90 minutes.
+Stopping automatically transcribes, summarises, and compresses
+WAV to MP3 (~10x size reduction). Recordings auto-stop after
+90 minutes.
 
 ## Output Structure
 
@@ -23,15 +25,18 @@ Each recording creates its own session directory:
 ```
 ~/Recordings/
 ├── meeting-20260607-143000/
-│   ├── mic.wav
-│   ├── system.wav
+│   ├── mic.mp3
+│   ├── system.mp3
 │   ├── transcript.txt
 │   └── summary.txt
 └── note-20260607-160000/
-    ├── mic.wav
+    ├── mic.mp3
     ├── transcript.txt
     └── summary.txt
 ```
+
+Use `--keep-wav` to retain original WAV files alongside the MP3s
+(e.g. for re-transcription with different settings).
 
 ## Setup
 
@@ -60,6 +65,7 @@ uv sync
 | `_record_meeting.sh` | Internal: launch dual-track ffmpeg |
 | `_record_note.sh` | Internal: launch mic-only ffmpeg |
 | `_stop.sh` | Internal: stop ffmpeg processes |
+| `_compress.sh` | Internal: convert WAV to MP3 |
 
 ## Cost
 

@@ -7,5 +7,7 @@ MEETING_PREFIX=meeting
 NOTE_PREFIX=note
 MIC_FILE=mic.wav
 SYS_FILE=system.wav
+MIC_MP3=mic.mp3
+SYS_MP3=system.mp3
 TRANSCRIPT_FILE=transcript.txt
 SUMMARY_FILE=summary.txt
