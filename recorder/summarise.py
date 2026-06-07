@@ -17,6 +17,7 @@ from recorder.lib import (
     SCRIPTS_ROOT,
     SUMMARY_FILE,
     SUMMARY_MODEL,
+    TITLE_FILE,
     load_env,
     log_error,
     log_info,
@@ -26,6 +27,9 @@ SYSTEM_PROMPT = (
     "You are a note-taking assistant. Given a transcript "
     "(which may be a multi-person meeting or a solo voice note), "
     "produce a concise summary.\n\n"
+    "Start your response with a single `# Title` line — a short "
+    "(3-8 word) descriptive title for this recording. "
+    "Then proceed with the summary sections.\n\n"
     "Use whichever of these sections are relevant:\n\n"
     "## Key Points\n"
     "- Bullet the main topics or ideas.\n\n"
@@ -102,10 +106,27 @@ def summarise(transcript_path: Path) -> None:
         print(data, file=sys.stderr)
         sys.exit(1)
 
-    summary = content[0]["text"]
+    text = content[0]["text"]
 
-    summary_file = transcript_path.parent / SUMMARY_FILE
+    # Parse title from first "# ..." line
+    title = ""
+    rest_lines = []
+    for i, line in enumerate(text.splitlines()):
+        if i == 0 and line.startswith("# "):
+            title = line[2:].strip()
+        else:
+            rest_lines.append(line)
+
+    summary = "\n".join(rest_lines).strip()
+
+    session_dir = transcript_path.parent
+    summary_file = session_dir / SUMMARY_FILE
     summary_file.write_text(summary + "\n")
+
+    if title:
+        title_file = session_dir / TITLE_FILE
+        title_file.write_text(title + "\n")
+        print(f"Title: {title}")
 
     print(summary)
     print()

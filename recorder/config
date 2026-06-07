@@ -3,10 +3,11 @@
 SUMMARY_MODEL=claude-haiku-4-5-20251001
 MAX_DURATION_SECS=5400
 RECORDINGS_DIR=~/Recordings
-MEETING_PREFIX=meeting
+MEETING_PREFIX=capture
 MIC_FILE=mic.wav
 SYS_FILE=system.wav
 MIC_MP3=mic.mp3
 SYS_MP3=system.mp3
 TRANSCRIPT_FILE=transcript.txt
 SUMMARY_FILE=summary.txt
+TITLE_FILE=title.txt

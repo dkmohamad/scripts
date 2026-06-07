@@ -20,8 +20,17 @@ MIC_MP3 = _CONFIG["MIC_MP3"]
 SYS_MP3 = _CONFIG["SYS_MP3"]
 TRANSCRIPT_FILE = _CONFIG["TRANSCRIPT_FILE"]
 SUMMARY_FILE = _CONFIG["SUMMARY_FILE"]
+TITLE_FILE = _CONFIG["TITLE_FILE"]
 META_FILE = ".meta"
 ACTIVE_FILE = Path("/tmp/capture.active")
+
+
+def get_notion_database_id() -> str | None:
+    """Return NOTION_DATABASE_ID from .env, or None if unset."""
+    import os
+
+    load_env()
+    return os.environ.get("NOTION_DATABASE_ID")
 
 
 def load_env() -> None:

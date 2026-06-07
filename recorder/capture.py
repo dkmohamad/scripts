@@ -2,12 +2,13 @@
 """Unified capture CLI for the recorder pipeline.
 
 Manages the full lifecycle: start recording, check status, stop +
-transcribe + summarise. Always records dual-track (mic + system).
+transcribe + summarise + compress + push to Notion. Always records
+dual-track (mic + system).
 
 Usage:
-    capture.py start
-    capture.py status
-    capture.py stop [--skip-summary] [--keep-wav]
+    capture start
+    capture status
+    capture stop [--skip-summary] [--skip-notion] [--keep-wav]
 """
 
 import argparse
@@ -250,32 +251,65 @@ def cmd_stop(args: argparse.Namespace) -> None:
     print("Compressing...")
     compress_session(session_dir, keep_wav=args.keep_wav)
 
+    # Push to Notion
+    if not args.skip_notion:
+        print()
+        print("Pushing to Notion...")
+        from recorder.notion_push import push_to_notion
+
+        push_to_notion(session_dir)
+    else:
+        print()
+        print("Skipped Notion push (--skip-notion).")
+
     print()
     print(f"All output in: {session_dir}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Capture audio recordings"
+        prog="capture",
+        description=(
+            "Record meetings (mic + system audio), then "
+            "transcribe, summarise, compress, and push to Notion."
+        ),
     )
     sub = parser.add_subparsers(dest="command")
 
-    sub.add_parser("start", help="Start recording")
+    sub.add_parser(
+        "start",
+        help="Start dual-track recording (mic + system)",
+    )
 
-    sub.add_parser("status", help="Check recording status")
+    sub.add_parser(
+        "status",
+        help="Show active recording duration and process info",
+    )
 
     p_stop = sub.add_parser(
-        "stop", help="Stop recording + transcribe + summarise"
+        "stop",
+        help="Stop recording + transcribe + summarise + push",
+        description=(
+            "Stop the active recording, then run the full "
+            "pipeline: transcribe (whisper.cpp), summarise "
+            "(Claude Haiku), compress WAV→MP3, and push to "
+            "Notion."
+        ),
     )
     p_stop.add_argument(
         "--skip-summary",
         action="store_true",
-        help="Skip summarisation after transcription",
+        help="skip AI summarisation (transcript still produced)",
+    )
+    p_stop.add_argument(
+        "--skip-notion",
+        action="store_true",
+        help="skip pushing the recording to Notion",
     )
     p_stop.add_argument(
         "--keep-wav",
         action="store_true",
-        help="Keep original WAV files after MP3 compression",
+        help="retain original WAV files alongside MP3s",
     )
 
     args = parser.parse_args()

@@ -8,14 +8,15 @@ Record calls (mic + system audio), transcribe with whisper.cpp
 ```bash
 capture start              # mic + system audio (dual-track)
 capture status             # check recording
-capture stop               # stop + transcribe + summarise + compress
+capture stop               # stop + transcribe + summarise + compress + Notion push
 capture stop --skip-summary
+capture stop --skip-notion # skip pushing to Notion
 capture stop --keep-wav    # keep original WAV files
 ```
 
-Stopping automatically transcribes, summarises, and compresses
-WAV to MP3 (~10x size reduction). Recordings auto-stop after
-90 minutes.
+Stopping automatically transcribes, summarises, compresses
+WAV to MP3 (~10x size reduction), and pushes to Notion.
+Recordings auto-stop after 90 minutes.
 
 ## Output Structure
 
@@ -23,10 +24,11 @@ Each recording creates its own session directory:
 
 ```
 ~/Recordings/
-└── meeting-20260607-143000/
+└── capture-20260607-143000/
     ├── mic.mp3
     ├── system.mp3
     ├── transcript.txt
+    ├── title.txt
     └── summary.txt
 ```
 
@@ -44,9 +46,46 @@ Use `--keep-wav` to retain original WAV files alongside the MP3s
 
 ```bash
 cp .env.template .env
-# Add your ANTHROPIC_API_KEY to .env
+# Add your keys to .env:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   NOTION_API_KEY=ntn_...
+#   NOTION_DATABASE_ID=...
 uv sync
 ```
+
+### Notion Integration
+
+The pipeline pushes each recording to a Notion "Recordings"
+database (under the Inbox page) with the title, date, duration,
+and local path as properties, plus the summary and full transcript
+as page body content.
+
+Audio files (MP3s) are **not** uploaded — the Notion API doesn't
+support file uploads. Use the `Path` property to locate files
+locally.
+
+#### Database setup
+
+Create a database under your Inbox page with these properties:
+
+| Property | Type | Notes |
+|----------|------|-------|
+| Title | Title | AI-generated short title |
+| Date | Date | Recording start time |
+| Duration | Number | Minutes |
+| Path | Text | Local session directory path |
+
+Then create an internal integration at
+https://www.notion.so/profile/integrations, share the database
+with it (database "..." menu → Connections), and add the token
+and database ID to `.env`.
+
+Required env vars in `.env`:
+- `NOTION_API_KEY` — Notion internal integration token
+- `NOTION_DATABASE_ID` — ID of the Recordings database
+
+If either is missing, the Notion push is skipped with a warning
+(no crash). Use `--skip-notion` to skip explicitly.
 
 ## Scripts
 
@@ -55,6 +94,7 @@ uv sync
 | `capture.py` | Main CLI: start/stop/status (console script: `capture`) |
 | `transcribe.py` | Transcribe a session directory |
 | `summarise.py` | Summarise transcript via Anthropic API |
+| `notion_push.py` | Push session to Notion database |
 | `lib.py` | Shared utilities for Python scripts |
 | `config` | Pipeline configuration (model, filenames) |
 | `_record_meeting.sh` | Internal: launch dual-track ffmpeg |
