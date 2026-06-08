@@ -16,10 +16,12 @@ Usage:
 import csv
 import subprocess
 import sys
+from dataclasses import dataclass
+from functools import total_ordering
 from pathlib import Path
-from typing import NamedTuple
 
 from recorder.lib import (
+    MERGE_GAP_SECS,
     MIC_FILE,
     SCRIPTS_ROOT,
     SYS_FILE,
@@ -31,15 +33,93 @@ from recorder.lib import (
 TRANSCRIBE_SH = SCRIPTS_ROOT / "transcribe" / "transcribe.sh"
 
 
-class Segment(NamedTuple):
-    """A single transcribed line.
-
-    Sorts by timestamp (first field), so a plain list.sort()
-    orders segments chronologically.
-    """
+@total_ordering
+@dataclass
+class Segment:
+    """A single transcribed segment."""
 
     timestamp: float
     transcript: str
+    label: str = ""
+
+    def __lt__(self, other: "Segment") -> bool:
+        return self.timestamp < other.timestamp
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Segment):
+            return NotImplemented
+        return self.timestamp == other.timestamp
+
+    def __add__(self, other: "Segment") -> "Segment":
+        """Combine two segments.
+
+        Averages timestamps and concatenates text.
+        Preserves the subtype of the left operand.
+        """
+        ts = (self.timestamp + other.timestamp) / 2
+        text = f"{self.transcript} {other.transcript}"
+        return type(self)(ts, text)
+
+    def __str__(self) -> str:
+        if self.label:
+            return f"[{self.label}] {self.transcript}"
+        return self.transcript
+
+    @classmethod
+    def from_csv_row(
+        cls, row: list[str]
+    ) -> "Segment | None":
+        """Parse a CSV row into a Segment.
+
+        Returns None for invalid or empty rows.
+        """
+        if len(row) < 3:
+            return None
+        text = (
+            ",".join(row[2:]).strip().strip('"').strip()
+        )
+        if not text:
+            return None
+        return cls(float(row[0]), text)
+
+    @classmethod
+    def consolidate(
+        cls, segments: "list[Segment]", gap: float
+    ) -> "list[Segment]":
+        """Consolidate segments closer than *gap* seconds.
+
+        All segments must match *cls*.  Raises TypeError
+        if a segment of a different type is encountered.
+        """
+        if not segments:
+            return []
+        merged: list[Segment] = [segments[0]]
+        for seg in segments:
+            if not isinstance(seg, cls):
+                raise TypeError(
+                    f"expected {cls.__name__},"
+                    f" got {type(seg).__name__}"
+                )
+        for seg in segments[1:]:
+            if seg.timestamp - merged[-1].timestamp <= gap:
+                merged[-1] = merged[-1] + seg
+            else:
+                merged.append(seg)
+        return merged
+
+
+@dataclass
+class YouSegment(Segment):
+    """A segment spoken by you (mic track)."""
+
+    label: str = "You"
+
+
+@dataclass
+class ThemSegment(Segment):
+    """A segment spoken by them (system track)."""
+
+    label: str = "Them"
 
 
 def transcribe_file(
@@ -73,16 +153,9 @@ def transcribe_file(
         reader = csv.reader(f)
         next(reader, None)  # skip header
         for row in reader:
-            if len(row) < 3:
-                continue
-            text = (
-                ",".join(row[2:]).strip().strip('"').strip()
-            )
-            if not text:
-                continue
-            segments.append(
-                Segment(float(row[0]), text)
-            )
+            seg = Segment.from_csv_row(row)
+            if seg is not None:
+                segments.append(seg)
 
     csv_path.unlink(missing_ok=True)
     segments.sort()
@@ -115,19 +188,25 @@ def transcribe_dialogue(session_dir: Path) -> None:
 
     log.info(f"Transcribing {session_dir.name}...")
 
-    mic = [
-        Segment(s.timestamp, f"[You] {s.transcript}")
-        for s in transcribe_file(mic_file)
-    ]
-    sys_ = [
-        Segment(s.timestamp, f"[Them] {s.transcript}")
-        for s in transcribe_file(sys_file)
-    ]
+    mic = YouSegment.consolidate(
+        [
+            YouSegment(s.timestamp, s.transcript)
+            for s in transcribe_file(mic_file)
+        ],
+        MERGE_GAP_SECS,
+    )
+    sys_ = ThemSegment.consolidate(
+        [
+            ThemSegment(s.timestamp, s.transcript)
+            for s in transcribe_file(sys_file)
+        ],
+        MERGE_GAP_SECS,
+    )
 
     rows = interleave_tracks(mic, sys_)
 
     _write_transcript(
-        session_dir, [s.transcript for s in rows]
+        session_dir, [str(s) for s in rows]
     )
 
 
@@ -146,9 +225,10 @@ def transcribe_monologue(
 
     segments = transcribe_file(audio_file)
 
+    merged = Segment.consolidate(segments, MERGE_GAP_SECS)
+
     _write_transcript(
-        session_dir,
-        [s.transcript for s in segments],
+        session_dir, [str(s) for s in merged]
     )
 
 

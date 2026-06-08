@@ -11,3 +11,4 @@ SYS_MP3=system.mp3
 TRANSCRIPT_FILE=transcript.txt
 SUMMARY_FILE=summary.txt
 TITLE_FILE=title.txt
+MERGE_GAP_SECS=3

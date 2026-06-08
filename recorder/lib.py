@@ -37,6 +37,7 @@ SYS_MP3: str = _require("SYS_MP3")
 TRANSCRIPT_FILE: str = _require("TRANSCRIPT_FILE")
 SUMMARY_FILE: str = _require("SUMMARY_FILE")
 TITLE_FILE: str = _require("TITLE_FILE")
+MERGE_GAP_SECS: float = float(_require("MERGE_GAP_SECS"))
 META_FILE = ".meta"
 ACTIVE_FILE = Path("/tmp/capture.active")
 
