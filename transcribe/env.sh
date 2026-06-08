@@ -40,7 +40,7 @@ VAD_MODEL="$VENDOR_DIR/whisper.cpp/models/ggml-silero-v6.2.0.bin"
 whisper_transcribe() {
     "$WHISPER_BIN" \
         -m "$WHISPER_MODEL" -f "$1" -np -nt -sns \
-        --vad -vm "$VAD_MODEL" 2> >(logger -t "$LOG_TAG" -p user.err)
+        --vad -vm "$VAD_MODEL" 2> >(tee >(logger -t "$LOG_TAG" -p user.err) >&2)
 }
 
 # Transcribe a WAV file with the multilingual model (auto-detects language).
@@ -48,7 +48,7 @@ whisper_transcribe_multi() {
     "$WHISPER_BIN" \
         -m "$WHISPER_MODEL_MULTI" -f "$1" -np -nt -sns \
         --language auto -mc 0 \
-        --vad -vm "$VAD_MODEL" 2> >(logger -t "$LOG_TAG" -p user.err)
+        --vad -vm "$VAD_MODEL" 2> >(tee >(logger -t "$LOG_TAG" -p user.err) >&2)
 }
 
 # ------------------------------------------------------------------------------

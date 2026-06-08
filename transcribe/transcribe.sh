@@ -100,7 +100,7 @@ transcribe_csv() {
         --vad -vm "$VAD_MODEL" \
         "${extra_args[@]}" \
         -ocsv -of "$output_base" \
-        2> >(logger -t "$LOG_TAG" -p user.err)
+        2> >(tee >(logger -t "$LOG_TAG" -p user.err) >&2)
 }
 
 if [ $# -lt 1 ]; then

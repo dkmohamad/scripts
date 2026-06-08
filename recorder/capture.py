@@ -5,10 +5,13 @@ Manages the full lifecycle: start recording, check status, stop +
 transcribe + summarise + compress + push to Notion. Always records
 dual-track (mic + system).
 
+Also supports processing pre-recorded voice notes from Notion.
+
 Usage:
     capture start
     capture status
     capture stop [--skip-summary] [--skip-notion] [--keep-wav]
+    capture process <page> [--skip-summary] [--skip-notion]
 """
 
 import argparse
@@ -229,9 +232,9 @@ def cmd_stop(args: argparse.Namespace) -> None:
     # Transcribe
     print()
     print("Transcribing...")
-    from recorder.transcribe import transcribe_one
+    from recorder.transcribe import transcribe_dialogue
 
-    transcribe_one(session_dir)
+    transcribe_dialogue(session_dir)
 
     # Summarise
     if not args.skip_summary:
@@ -261,6 +264,82 @@ def cmd_stop(args: argparse.Namespace) -> None:
     else:
         print()
         print("Skipped Notion push (--skip-notion).")
+
+    print()
+    print(f"All output in: {session_dir}")
+
+
+def cmd_process(args: argparse.Namespace) -> None:
+    from recorder._notion_fetch import (
+        download_file,
+        extract_page_id,
+        fetch_audio_block,
+        parse_recording_datetime,
+    )
+
+    # 1. Extract page ID
+    page_id = extract_page_id(args.page)
+    print(f"Notion page: {page_id}")
+
+    # 2. Fetch audio block
+    print("Fetching audio from Notion...")
+    dl_url, filename = fetch_audio_block(page_id)
+    print(f"  Audio: {filename}")
+
+    # 3. Parse recording timestamp from filename
+    rec_dt = parse_recording_datetime(filename)
+    if rec_dt:
+        print(f"  Recorded: {rec_dt:%Y-%m-%d %H:%M}")
+        ts = rec_dt.strftime("%Y%m%d-%H%M%S")
+    else:
+        print("  Warning: could not parse timestamp")
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    # 4. Create session dir
+    session_dir = RECORDINGS_DIR / f"capture-{ts}"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    print(f"  Session: {session_dir}")
+
+    # 5. Download audio
+    print()
+    print("Downloading audio...")
+    audio_path = download_file(
+        dl_url, session_dir / filename
+    )
+    print(f"  Saved: {audio_path.name}")
+
+    # 6. Transcribe
+    print()
+    print("Transcribing...")
+    from recorder.transcribe import transcribe_monologue
+
+    transcribe_monologue(session_dir, filename)
+
+    # 7. Summarise
+    if not args.skip_summary:
+        transcript = session_dir / TRANSCRIPT_FILE
+        if transcript.exists():
+            print()
+            print("Summarising...")
+            from recorder.summarise import summarise
+
+            summarise(transcript)
+    else:
+        print()
+        print("Skipped summary (--skip-summary).")
+
+    # 8. Update Notion page
+    if not args.skip_notion:
+        print()
+        print("Updating Notion page...")
+        from recorder._notion_update import (
+            update_notion_page,
+        )
+
+        update_notion_page(page_id, session_dir, rec_dt)
+    else:
+        print()
+        print("Skipped Notion update (--skip-notion).")
 
     print()
     print(f"All output in: {session_dir}")
@@ -312,6 +391,32 @@ def main() -> None:
         help="retain original WAV files alongside MP3s",
     )
 
+    p_process = sub.add_parser(
+        "process",
+        help=(
+            "Process a pre-recorded voice note from Notion"
+        ),
+        description=(
+            "Download audio from an existing Notion page, "
+            "transcribe, summarise, and update the page "
+            "with results."
+        ),
+    )
+    p_process.add_argument(
+        "page",
+        help="Notion page URL or page ID",
+    )
+    p_process.add_argument(
+        "--skip-summary",
+        action="store_true",
+        help="skip AI summarisation",
+    )
+    p_process.add_argument(
+        "--skip-notion",
+        action="store_true",
+        help="skip updating the Notion page",
+    )
+
     args = parser.parse_args()
     if not args.command:
         parser.print_help()
@@ -323,6 +428,8 @@ def main() -> None:
         cmd_status(args)
     elif args.command == "stop":
         cmd_stop(args)
+    elif args.command == "process":
+        cmd_process(args)
 
 
 if __name__ == "__main__":
