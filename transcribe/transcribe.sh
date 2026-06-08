@@ -22,6 +22,7 @@
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+source "$SHARED_DIR/audio.sh"
 
 BABEL=false
 CSV=false
@@ -64,17 +65,6 @@ collect_files() {
     fi
 }
 
-# Convert a non-wav audio file to 16kHz mono WAV via ffmpeg.
-# Returns 1 if conversion fails (not an audio file).
-preprocess() {
-    local src="$1" dest="$2"
-    if ffmpeg -y -i "$src" -ar 16000 -ac 1 "$dest" 2>/dev/null; then
-        return 0
-    else
-        rm -f "$dest"
-        return 1
-    fi
-}
 
 # Transcribe a wav file, returning cleaned text on stdout.
 transcribe() {
@@ -132,7 +122,7 @@ if $CSV; then
         if [[ "$f" == *.wav ]]; then
             wav="$f"
         else
-            if ! preprocess "$f" "$TMPWAV"; then
+            if ! to_wav "$f" "$TMPWAV"; then
                 echo "  $name (skipped, not audio)" >&2
                 continue
             fi
@@ -152,7 +142,7 @@ else
         if [[ "$f" == *.wav ]]; then
             wav="$f"
         else
-            if ! preprocess "$f" "$TMPWAV"; then
+            if ! to_wav "$f" "$TMPWAV"; then
                 echo "  $name (skipped, not audio)" >&2
                 continue
             fi

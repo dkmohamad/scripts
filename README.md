@@ -59,4 +59,22 @@ cp .env.template .env
 sudo apt install ffmpeg pulseaudio-utils
 ```
 
+### Vendor binaries
+
+The `vendor/` directory contains third-party binaries:
+
+- **whisper.cpp** — speech-to-text (git submodule, built from source)
+- **deep-filter** — DeepFilterNet neural speech enhancement
+
+To download the deep-filter binary:
+
+```bash
+gh release download v0.5.6 --repo Rikorose/DeepFilterNet \
+  --pattern "deep-filter-0.5.6-x86_64-unknown-linux-musl" \
+  --dir vendor/deep-filter
+mv vendor/deep-filter/deep-filter-0.5.6-x86_64-unknown-linux-musl \
+  vendor/deep-filter/deep-filter
+chmod +x vendor/deep-filter/deep-filter
+```
+
 See individual tool READMEs for setup instructions.
