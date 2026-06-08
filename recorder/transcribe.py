@@ -17,6 +17,7 @@ import csv
 import subprocess
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 from recorder.lib import (
     MIC_FILE,
@@ -29,9 +30,20 @@ from recorder.lib import (
 TRANSCRIBE_SH = SCRIPTS_ROOT / "transcribe" / "transcribe.sh"
 
 
+class Segment(NamedTuple):
+    """A single transcribed line.
+
+    Sorts by timestamp (first field), so a plain list.sort()
+    orders segments chronologically.
+    """
+
+    timestamp: float
+    transcript: str
+
+
 def transcribe_file(
     audio_path: Path,
-) -> list[tuple[float, str]]:
+) -> list[Segment]:
     """Run whisper on an audio file.
 
     Returns a list of (start_seconds, text) segments sorted
@@ -49,7 +61,7 @@ def transcribe_file(
         check=True,
     )
 
-    segments: list[tuple[float, str]] = []
+    segments: list[Segment] = []
     with csv_path.open(newline="") as f:
         reader = csv.reader(f)
         next(reader, None)  # skip header
@@ -61,98 +73,76 @@ def transcribe_file(
             )
             if not text:
                 continue
-            start = float(row[0])
-            segments.append((start, text))
+            segments.append(
+                Segment(float(row[0]), text)
+            )
 
     csv_path.unlink(missing_ok=True)
-    segments.sort(key=lambda r: r[0])
+    segments.sort()
     return segments
 
 
 def interleave_tracks(
-    *tracks: tuple[str, list[tuple[float, str]]],
-) -> list[tuple[float, str, str]]:
-    """Interleave multiple labelled tracks by timestamp.
+    *tracks: list[Segment],
+) -> list[Segment]:
+    """Interleave multiple tracks by timestamp.
 
-    Each track is (label, segments) where segments come from
-    transcribe_file(). Returns (start, label, text) sorted by
-    timestamp.
+    Each track is a list of Segments. Returns a single merged
+    list sorted by timestamp.
     """
-    rows: list[tuple[float, str, str]] = []
-    for label, segments in tracks:
-        for start, text in segments:
-            rows.append((start, label, text))
-    rows.sort(key=lambda r: r[0])
-    return rows
+    merged: list[Segment] = []
+    for segments in tracks:
+        merged.extend(segments)
+    merged.sort()
+    return merged
 
 
 def transcribe_dialogue(session_dir: Path) -> None:
     """Transcribe dual-track (mic + system) with speaker labels."""
-    mic_file = session_dir / MIC_FILE
-    sys_file = session_dir / SYS_FILE
-    transcript = session_dir / TRANSCRIPT_FILE
-
-    if not mic_file.exists():
-        log.error(f"No {MIC_FILE} found in {session_dir}")
-        sys.exit(1)
-
-    if transcript.exists():
-        log.info(
-            f"Skipping {session_dir.name} (transcript exists)"
-        )
+    if _skip_if_done(session_dir):
         return
+
+    mic_file, sys_file = _require_files(
+        session_dir, MIC_FILE, SYS_FILE
+    )
 
     log.info(f"Transcribing {session_dir.name}...")
 
-    if not sys_file.exists():
-        log.error(f"No {SYS_FILE} in {session_dir}")
-        sys.exit(1)
+    mic = [
+        Segment(s.timestamp, f"[You] {s.transcript}")
+        for s in transcribe_file(mic_file)
+    ]
+    sys_ = [
+        Segment(s.timestamp, f"[Them] {s.transcript}")
+        for s in transcribe_file(sys_file)
+    ]
 
-    mic_segments = transcribe_file(mic_file)
-    sys_segments = transcribe_file(sys_file)
+    rows = interleave_tracks(mic, sys_)
 
-    rows = interleave_tracks(
-        ("[You]", mic_segments),
-        ("[Them]", sys_segments),
+    _write_transcript(
+        session_dir, [s.transcript for s in rows]
     )
-
-    with transcript.open("w") as f:
-        for _, label, text in rows:
-            f.write(f"{label} {text}\n")
-
-    line_count = len(transcript.read_text().splitlines())
-    log.info(f"Wrote {transcript} ({line_count} lines)")
 
 
 def transcribe_monologue(
     session_dir: Path, audio_filename: str
 ) -> None:
     """Transcribe a single audio file as plain text."""
-    audio_file = session_dir / audio_filename
-    transcript = session_dir / TRANSCRIPT_FILE
-
-    if not audio_file.exists():
-        log.error(
-            f"No {audio_filename} found in {session_dir}"
-        )
-        sys.exit(1)
-
-    if transcript.exists():
-        log.info(
-            f"Skipping {session_dir.name} (transcript exists)"
-        )
+    if _skip_if_done(session_dir):
         return
+
+    (audio_file,) = _require_files(
+        session_dir, audio_filename
+    )
 
     log.info(f"Transcribing {session_dir.name}...")
 
     segments = transcribe_file(audio_file)
 
-    with transcript.open("w") as f:
-        for _, text in segments:
-            f.write(f"{text}\n")
-
-    line_count = len(transcript.read_text().splitlines())
-    log.info(f"Wrote {transcript} ({line_count} lines)")
+    _write_transcript(
+        session_dir,
+        [s.transcript for s in segments],
+    )
 
 
 def main() -> None:
@@ -166,6 +156,46 @@ def main() -> None:
         sys.exit(1)
 
     transcribe_dialogue(session_dir)
+
+
+# --- Private helpers ---
+
+
+def _require_files(
+    session_dir: Path, *filenames: str
+) -> list[Path]:
+    """Resolve audio files, exiting if any are missing."""
+    paths: list[Path] = []
+    for name in filenames:
+        p = session_dir / name
+        if not p.exists():
+            log.error(f"No {name} found in {session_dir}")
+            sys.exit(1)
+        paths.append(p)
+    return paths
+
+
+def _write_transcript(
+    session_dir: Path, lines: list[str]
+) -> None:
+    """Write transcript lines and log the result."""
+    transcript = session_dir / TRANSCRIPT_FILE
+    with transcript.open("w") as f:
+        for line in lines:
+            f.write(f"{line}\n")
+    log.info(
+        f"Wrote {transcript} ({len(lines)} lines)"
+    )
+
+
+def _skip_if_done(session_dir: Path) -> bool:
+    """Return True (and log) if a transcript already exists."""
+    if (session_dir / TRANSCRIPT_FILE).exists():
+        log.info(
+            f"Skipping {session_dir.name} (transcript exists)"
+        )
+        return True
+    return False
 
 
 if __name__ == "__main__":
