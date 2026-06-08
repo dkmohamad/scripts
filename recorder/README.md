@@ -71,10 +71,14 @@ source, transcription mode, and Notion operation:
 acquire → [cleanup] → transcribe → [summarise] → compress → [notify]
 ```
 
+When `--cleanup` is used, audio analysis reports (RMS levels, noise
+floor, SNR, clipping) are logged before and after preprocessing so
+you can verify the cleanup improved the signal.
+
 | Stage | `stop` | `process` |
 |-------|--------|-----------|
 | **acquire** | stop ffmpeg, read WAV from disk | download audio from Notion page |
-| **cleanup** | denoise mic.wav (`--cleanup`) | denoise downloaded file (`--cleanup`) |
+| **cleanup** | analyse + denoise mic.wav + analyse (`--cleanup`) | analyse + denoise downloaded file + analyse (`--cleanup`) |
 | **transcribe** | dialogue (mic + system, speaker labels) | monologue (single file, plain text) |
 | **summarise** | Claude Haiku summary (`--skip-summary` to skip) | same |
 | **compress** | WAV → MP3 (`--keep-wav` to retain) | WAV → MP3 |
@@ -185,6 +189,26 @@ Whisper transcription logs separately to the systemd journal:
 ```bash
 journalctl -t whisper-ptt --since "1 hour ago"
 ```
+
+## Troubleshooting
+
+### DeepFilterNet clipping warnings
+
+When running with `--cleanup` you may see warnings like:
+
+```
+[WARN  df::tract] Possible clipping detected (1.001).
+```
+
+This means DeepFilterNet's speech enhancement is pushing peaks to
+or just past the maximum amplitude (1.0). The values are typically
+very close to the limit (1.000–1.001) and the distortion is not
+audible. The pipeline's peak-normalize step runs after deep-filter
+and brings levels back to -1 dB, so the final output is clean.
+
+The before/after audio analysis logged during preprocessing shows
+the clipping ratio — if it's near zero after processing, no action
+is needed.
 
 ## Cost
 

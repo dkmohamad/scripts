@@ -278,8 +278,7 @@ def _cmd_stop(args: argparse.Namespace) -> None:
             mic_path = session_dir / MIC_FILE
             if mic_path.exists():
                 log.info("Preprocessing mic audio...")
-                clean = preprocess_audio(mic_path)
-                log.info(f"  Clean: {clean.name}")
+                preprocess_audio(mic_path)
 
         log.info("Transcribing...")
         transcribe_dialogue(session_dir)
@@ -339,7 +338,6 @@ def _cmd_process(args: argparse.Namespace) -> None:
             log.info("Preprocessing audio...")
             clean = preprocess_audio(audio_path)
             filename = clean.name
-            log.info(f"  Clean: {filename}")
 
         log.info("Transcribing...")
         transcribe_monologue(session_dir, filename)

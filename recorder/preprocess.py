@@ -10,8 +10,10 @@ Usage:
 """
 
 import argparse
+import functools
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -86,6 +88,24 @@ def analyze(audio_path: Path) -> AudioReport:
     )
 
 
+def _with_analysis(
+    fn: Callable[..., Path],
+) -> Callable[..., Path]:
+    """Log audio analysis before and after processing."""
+
+    @functools.wraps(fn)
+    def wrapper(audio_path: Path, *a: object, **kw: object) -> Path:
+        log.info("=== Before ===")
+        log.info(f"\n{analyze(audio_path)}")
+        result = fn(audio_path, *a, **kw)
+        log.info("=== After ===")
+        log.info(f"\n{analyze(result)}")
+        return result
+
+    return wrapper
+
+
+@_with_analysis
 def preprocess(
     audio_path: Path, output_path: Path | None = None
 ) -> Path:
@@ -156,15 +176,7 @@ def main() -> None:
         log.info(f"\n{report}")
 
     elif args.command == "clean":
-        log.info("=== Before ===")
-        before = analyze(args.file)
-        log.info(f"\n{before}")
-
-        out = preprocess(args.file, args.output)
-
-        log.info("\n=== After ===")
-        after = analyze(out)
-        log.info(f"\n{after}")
+        preprocess(args.file, args.output)
 
 
 # -- Private helpers ---------------------------------------------------------
