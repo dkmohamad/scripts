@@ -149,6 +149,7 @@ def monitor(keyboards: list[InputDevice], test_mode: bool = False) -> None:
 
 
 def main() -> None:
+    """Listen for PTT hotkey events and trigger recording."""
     test_mode = "--test" in sys.argv
 
     keyboards = find_keyboards()

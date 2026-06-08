@@ -25,10 +25,8 @@ guidelines fill in what the tools cannot catch.
   blank lines. Sort alphabetically within each group (ruff `I` rule).
 - Prefer `from x import y` over bare `import x` for specific names.
 - Avoid wildcard imports (`from x import *`).
-- Lazy imports inside functions are fine when the module is heavy or
-  only needed conditionally (this is an established pattern in the
-  codebase, e.g. `from recorder.transcribe import ...` inside
-  `cmd_stop`).
+- All imports must be at the top of the file — never inside function
+  bodies. Enforced by ruff `PLC0415`.
 
 ### Naming
 

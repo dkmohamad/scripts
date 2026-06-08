@@ -146,6 +146,7 @@ def transcribe_monologue(
 
 
 def main() -> None:
+    """CLI entry point for transcribe."""
     if len(sys.argv) < 2:
         log.error("Usage: transcribe.py <session_dir>")
         sys.exit(1)

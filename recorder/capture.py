@@ -24,6 +24,13 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from recorder._notion_fetch import (
+    download_file,
+    extract_page_id,
+    fetch_audio_block,
+    parse_recording_datetime,
+)
+from recorder._notion_update import update_notion_page
 from recorder.lib import (
     ACTIVE_FILE,
     MAX_DURATION_SECS,
@@ -35,19 +42,22 @@ from recorder.lib import (
     TRANSCRIPT_FILE,
     log,
 )
+from recorder.notion_push import push_to_notion
+from recorder.summarise import summarise
+from recorder.transcribe import transcribe_dialogue, transcribe_monologue
 
 RECORDER_DIR = Path(__file__).resolve().parent
 COMPRESS_SCRIPT = RECORDER_DIR / "_compress.sh"
 
 
-def human_duration(secs: int) -> str:
+def _human_duration(secs: int) -> str:
     h = secs // 3600
     m = (secs % 3600) // 60
     s = secs % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
-def human_size(path: Path) -> str:
+def _human_size(path: Path) -> str:
     result = subprocess.run(
         ["numfmt", "--to=iec-i", "--suffix=B", str(path.stat().st_size)],
         capture_output=True,
@@ -56,7 +66,7 @@ def human_size(path: Path) -> str:
     return result.stdout.strip()
 
 
-def read_meta(session_dir: Path) -> dict[str, str]:
+def _read_meta(session_dir: Path) -> dict[str, str]:
     meta_path = session_dir / META_FILE
     meta: dict[str, str] = {}
     for line in meta_path.read_text().splitlines():
@@ -68,14 +78,14 @@ def read_meta(session_dir: Path) -> dict[str, str]:
     return meta
 
 
-def write_meta(session_dir: Path, meta: dict[str, str]) -> None:
+def _write_meta(session_dir: Path, meta: dict[str, str]) -> None:
     meta_path = session_dir / META_FILE
     with meta_path.open("w") as f:
         for key, value in meta.items():
             f.write(f"{key}={value}\n")
 
 
-def get_active_session() -> Path | None:
+def _get_active_session() -> Path | None:
     if not ACTIVE_FILE.exists():
         return None
     path = Path(ACTIVE_FILE.read_text().strip())
@@ -84,7 +94,7 @@ def get_active_session() -> Path | None:
     return None
 
 
-def compress_session(
+def _compress_session(
     session_dir: Path, keep_wav: bool = False
 ) -> None:
     """Compress WAV files to MP3 after transcription."""
@@ -94,8 +104,8 @@ def compress_session(
     subprocess.run(cmd, check=False)
 
 
-def cmd_start(args: argparse.Namespace) -> None:
-    active = get_active_session()
+def _cmd_start(args: argparse.Namespace) -> None:
+    active = _get_active_session()
     if active is not None:
         log.error(
             "Recording already in progress "
@@ -133,7 +143,7 @@ def cmd_start(args: argparse.Namespace) -> None:
         "SYS_PID": str(pids["sys_pid"]),
         "START_EPOCH": str(int(time.time())),
     }
-    write_meta(session_dir, meta)
+    _write_meta(session_dir, meta)
     ACTIVE_FILE.write_text(str(session_dir))
 
     log.info(f"Recording started: {session_dir.name}")
@@ -146,13 +156,13 @@ def cmd_start(args: argparse.Namespace) -> None:
     )
 
 
-def cmd_status(args: argparse.Namespace) -> None:
-    session_dir = get_active_session()
+def _cmd_status(args: argparse.Namespace) -> None:
+    session_dir = _get_active_session()
     if session_dir is None:
         log.info("No recording in progress.")
         return
 
-    meta = read_meta(session_dir)
+    meta = _read_meta(session_dir)
     now = int(time.time())
     start = int(meta["START_EPOCH"])
     duration = now - start
@@ -166,7 +176,7 @@ def cmd_status(args: argparse.Namespace) -> None:
         pass
 
     log.info(
-        f"Recording in progress: {human_duration(duration)}"
+        f"Recording in progress: {_human_duration(duration)}"
     )
     log.info(f"  Session: {session_dir}")
     log.info(f"  Mic:     pid {mic_pid} ({mic_alive})")
@@ -185,19 +195,19 @@ def cmd_status(args: argparse.Namespace) -> None:
     remaining = MAX_DURATION_SECS - duration
     if remaining > 0:
         log.info(
-            f"  Auto-stop in: {human_duration(remaining)}"
+            f"  Auto-stop in: {_human_duration(remaining)}"
         )
     else:
         log.warning("  Past max duration")
 
 
-def cmd_stop(args: argparse.Namespace) -> None:
-    session_dir = get_active_session()
+def _cmd_stop(args: argparse.Namespace) -> None:
+    session_dir = _get_active_session()
     if session_dir is None:
         log.error("No recording in progress.")
         sys.exit(1)
 
-    meta = read_meta(session_dir)
+    meta = _read_meta(session_dir)
     start = int(meta["START_EPOCH"])
 
     fh = logging.FileHandler(session_dir / "capture.log")
@@ -221,12 +231,12 @@ def cmd_stop(args: argparse.Namespace) -> None:
     duration = now - start
 
     log.info("Recording stopped.")
-    log.info(f"  Duration: {human_duration(duration)}")
+    log.info(f"  Duration: {_human_duration(duration)}")
 
     for fname in [MIC_FILE, SYS_FILE]:
         fpath = session_dir / fname
         if fpath.exists():
-            log.info(f"  {fname}: {human_size(fpath)}")
+            log.info(f"  {fname}: {_human_size(fpath)}")
 
     log.info(
         f"Recording stopped: {session_dir.name} "
@@ -238,8 +248,6 @@ def cmd_stop(args: argparse.Namespace) -> None:
 
     # Transcribe
     log.info("Transcribing...")
-    from recorder.transcribe import transcribe_dialogue
-
     transcribe_dialogue(session_dir)
 
     # Summarise
@@ -247,21 +255,17 @@ def cmd_stop(args: argparse.Namespace) -> None:
         transcript = session_dir / TRANSCRIPT_FILE
         if transcript.exists():
             log.info("Summarising...")
-            from recorder.summarise import summarise
-
             summarise(transcript)
     else:
         log.info("Skipped summary (--skip-summary).")
 
     # Compress WAV to MP3
     log.info("Compressing...")
-    compress_session(session_dir, keep_wav=args.keep_wav)
+    _compress_session(session_dir, keep_wav=args.keep_wav)
 
     # Push to Notion
     if not args.skip_notion:
         log.info("Pushing to Notion...")
-        from recorder.notion_push import push_to_notion
-
         push_to_notion(session_dir)
     else:
         log.info("Skipped Notion push (--skip-notion).")
@@ -272,14 +276,7 @@ def cmd_stop(args: argparse.Namespace) -> None:
     log.info(f"All output in: {session_dir}")
 
 
-def cmd_process(args: argparse.Namespace) -> None:
-    from recorder._notion_fetch import (
-        download_file,
-        extract_page_id,
-        fetch_audio_block,
-        parse_recording_datetime,
-    )
-
+def _cmd_process(args: argparse.Namespace) -> None:
     # 1. Extract page ID
     page_id = extract_page_id(args.page)
     log.info(f"Notion page: {page_id}")
@@ -320,8 +317,6 @@ def cmd_process(args: argparse.Namespace) -> None:
 
     # 6. Transcribe
     log.info("Transcribing...")
-    from recorder.transcribe import transcribe_monologue
-
     transcribe_monologue(session_dir, filename)
 
     # 7. Summarise
@@ -329,8 +324,6 @@ def cmd_process(args: argparse.Namespace) -> None:
         transcript = session_dir / TRANSCRIPT_FILE
         if transcript.exists():
             log.info("Summarising...")
-            from recorder.summarise import summarise
-
             summarise(transcript)
     else:
         log.info("Skipped summary (--skip-summary).")
@@ -338,10 +331,6 @@ def cmd_process(args: argparse.Namespace) -> None:
     # 8. Update Notion page
     if not args.skip_notion:
         log.info("Updating Notion page...")
-        from recorder._notion_update import (
-            update_notion_page,
-        )
-
         update_notion_page(page_id, session_dir, rec_dt)
     else:
         log.info("Skipped Notion update (--skip-notion).")
@@ -353,6 +342,7 @@ def cmd_process(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    """CLI entry point for the capture pipeline."""
     parser = argparse.ArgumentParser(
         prog="capture",
         description=(
@@ -436,13 +426,13 @@ def main() -> None:
         sys.exit(1)
 
     if args.command == "start":
-        cmd_start(args)
+        _cmd_start(args)
     elif args.command == "status":
-        cmd_status(args)
+        _cmd_status(args)
     elif args.command == "stop":
-        cmd_stop(args)
+        _cmd_stop(args)
     elif args.command == "process":
-        cmd_process(args)
+        _cmd_process(args)
 
 
 if __name__ == "__main__":

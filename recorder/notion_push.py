@@ -7,8 +7,10 @@ Usage:
     notion_push.py <session_dir>
 """
 
+import os
 import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -123,9 +125,8 @@ def _parse_date_from_dirname(
 
 
 def push_to_notion(session_dir: Path) -> None:
+    """Create a Notion page from a recording session's transcript and summary."""
     load_env()
-
-    import os
 
     api_key = os.environ.get("NOTION_API_KEY", "")
     database_id = get_notion_database_id()
@@ -154,7 +155,6 @@ def push_to_notion(session_dir: Path) -> None:
     if stop_epoch and start_epoch:
         duration_mins = (stop_epoch - start_epoch) // 60
     elif start_epoch:
-        import time
         duration_mins = (int(time.time()) - start_epoch) // 60
     else:
         duration_mins = 0
@@ -234,6 +234,7 @@ def push_to_notion(session_dir: Path) -> None:
 
 
 def main() -> None:
+    """CLI entry point for notion_push."""
     if len(sys.argv) < 2:
         log.error("Usage: notion_push.py <session_dir>")
         sys.exit(1)

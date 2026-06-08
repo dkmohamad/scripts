@@ -1,6 +1,7 @@
 """Shared utilities for the recorder pipeline."""
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -44,8 +45,6 @@ log.addHandler(_stream_handler)
 
 def get_notion_database_id() -> str | None:
     """Return NOTION_DATABASE_ID from .env, or None if unset."""
-    import os
-
     load_env()
     return os.environ.get("NOTION_DATABASE_ID")
 

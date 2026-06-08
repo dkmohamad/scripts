@@ -8,6 +8,7 @@ Usage:
     summarise.py <transcript.txt>
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -52,9 +53,8 @@ API_URL = "https://api.anthropic.com/v1/messages"
 
 
 def summarise(transcript_path: Path) -> None:
+    """Summarise a transcript and write the result alongside it."""
     load_env()
-
-    import os
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
@@ -130,6 +130,7 @@ def summarise(transcript_path: Path) -> None:
 
 
 def main() -> None:
+    """CLI entry point for summarise."""
     if len(sys.argv) < 2:
         log.error("Usage: summarise.py <transcript.txt>")
         sys.exit(1)
