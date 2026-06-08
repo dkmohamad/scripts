@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -32,7 +33,7 @@ from recorder.lib import (
     RECORDINGS_DIR,
     SYS_FILE,
     TRANSCRIPT_FILE,
-    log_info,
+    log,
 )
 
 RECORDER_DIR = Path(__file__).resolve().parent
@@ -96,10 +97,9 @@ def compress_session(
 def cmd_start(args: argparse.Namespace) -> None:
     active = get_active_session()
     if active is not None:
-        print(
+        log.error(
             "Recording already in progress "
-            "(see: capture.py status)",
-            file=sys.stderr,
+            "(see: capture.py status)"
         )
         sys.exit(1)
 
@@ -120,9 +120,9 @@ def cmd_start(args: argparse.Namespace) -> None:
     )
 
     if result.returncode != 0:
-        print(
-            f"Failed to start recording: {result.stderr.strip()}",
-            file=sys.stderr,
+        log.error(
+            "Failed to start recording: "
+            f"{result.stderr.strip()}"
         )
         sys.exit(1)
 
@@ -136,12 +136,11 @@ def cmd_start(args: argparse.Namespace) -> None:
     write_meta(session_dir, meta)
     ACTIVE_FILE.write_text(str(session_dir))
 
-    log_info(f"Recording started: {session_dir.name}")
-    print("Recording started.")
-    print(f"  Session: {session_dir}")
-    print(f"  Mic PID: {pids['mic_pid']}")
-    print(f"  Sys PID: {pids['sys_pid']}")
-    print(
+    log.info(f"Recording started: {session_dir.name}")
+    log.info(f"  Session: {session_dir}")
+    log.info(f"  Mic PID: {pids['mic_pid']}")
+    log.info(f"  Sys PID: {pids['sys_pid']}")
+    log.info(
         f"  Max duration: {MAX_DURATION_SECS // 60} min "
         "(auto-stop)"
     )
@@ -150,7 +149,7 @@ def cmd_start(args: argparse.Namespace) -> None:
 def cmd_status(args: argparse.Namespace) -> None:
     session_dir = get_active_session()
     if session_dir is None:
-        print("No recording in progress.")
+        log.info("No recording in progress.")
         return
 
     meta = read_meta(session_dir)
@@ -166,11 +165,11 @@ def cmd_status(args: argparse.Namespace) -> None:
     except (ProcessLookupError, PermissionError):
         pass
 
-    print(
+    log.info(
         f"Recording in progress: {human_duration(duration)}"
     )
-    print(f"  Session: {session_dir}")
-    print(f"  Mic:     pid {mic_pid} ({mic_alive})")
+    log.info(f"  Session: {session_dir}")
+    log.info(f"  Mic:     pid {mic_pid} ({mic_alive})")
 
     sys_pid_str = meta.get("SYS_PID", "")
     if sys_pid_str:
@@ -181,25 +180,33 @@ def cmd_status(args: argparse.Namespace) -> None:
             sys_alive = "running"
         except (ProcessLookupError, PermissionError):
             pass
-        print(f"  System:  pid {sys_pid} ({sys_alive})")
+        log.info(f"  System:  pid {sys_pid} ({sys_alive})")
 
     remaining = MAX_DURATION_SECS - duration
     if remaining > 0:
-        print(
+        log.info(
             f"  Auto-stop in: {human_duration(remaining)}"
         )
     else:
-        print("  ⚠ Past max duration")
+        log.warning("  Past max duration")
 
 
 def cmd_stop(args: argparse.Namespace) -> None:
     session_dir = get_active_session()
     if session_dir is None:
-        print("No recording in progress.", file=sys.stderr)
+        log.error("No recording in progress.")
         sys.exit(1)
 
     meta = read_meta(session_dir)
     start = int(meta["START_EPOCH"])
+
+    fh = logging.FileHandler(session_dir / "capture.log")
+    fh.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s"
+        )
+    )
+    log.addHandler(fh)
 
     # Stop ffmpeg processes
     stop_script = RECORDER_DIR / "_stop.sh"
@@ -213,15 +220,15 @@ def cmd_stop(args: argparse.Namespace) -> None:
     now = int(time.time())
     duration = now - start
 
-    print("Recording stopped.")
-    print(f"  Duration: {human_duration(duration)}")
+    log.info("Recording stopped.")
+    log.info(f"  Duration: {human_duration(duration)}")
 
     for fname in [MIC_FILE, SYS_FILE]:
         fpath = session_dir / fname
         if fpath.exists():
-            print(f"  {fname}: {human_size(fpath)}")
+            log.info(f"  {fname}: {human_size(fpath)}")
 
-    log_info(
+    log.info(
         f"Recording stopped: {session_dir.name} "
         f"(duration={duration}s)"
     )
@@ -230,8 +237,7 @@ def cmd_stop(args: argparse.Namespace) -> None:
     ACTIVE_FILE.unlink(missing_ok=True)
 
     # Transcribe
-    print()
-    print("Transcribing...")
+    log.info("Transcribing...")
     from recorder.transcribe import transcribe_dialogue
 
     transcribe_dialogue(session_dir)
@@ -240,33 +246,30 @@ def cmd_stop(args: argparse.Namespace) -> None:
     if not args.skip_summary:
         transcript = session_dir / TRANSCRIPT_FILE
         if transcript.exists():
-            print()
-            print("Summarising...")
+            log.info("Summarising...")
             from recorder.summarise import summarise
 
             summarise(transcript)
     else:
-        print()
-        print("Skipped summary (--skip-summary).")
+        log.info("Skipped summary (--skip-summary).")
 
     # Compress WAV to MP3
-    print()
-    print("Compressing...")
+    log.info("Compressing...")
     compress_session(session_dir, keep_wav=args.keep_wav)
 
     # Push to Notion
     if not args.skip_notion:
-        print()
-        print("Pushing to Notion...")
+        log.info("Pushing to Notion...")
         from recorder.notion_push import push_to_notion
 
         push_to_notion(session_dir)
     else:
-        print()
-        print("Skipped Notion push (--skip-notion).")
+        log.info("Skipped Notion push (--skip-notion).")
 
-    print()
-    print(f"All output in: {session_dir}")
+    log.removeHandler(fh)
+    fh.close()
+
+    log.info(f"All output in: {session_dir}")
 
 
 def cmd_process(args: argparse.Namespace) -> None:
@@ -279,38 +282,44 @@ def cmd_process(args: argparse.Namespace) -> None:
 
     # 1. Extract page ID
     page_id = extract_page_id(args.page)
-    print(f"Notion page: {page_id}")
+    log.info(f"Notion page: {page_id}")
 
     # 2. Fetch audio block
-    print("Fetching audio from Notion...")
+    log.info("Fetching audio from Notion...")
     dl_url, filename = fetch_audio_block(page_id)
-    print(f"  Audio: {filename}")
+    log.info(f"  Audio: {filename}")
 
     # 3. Parse recording timestamp from filename
     rec_dt = parse_recording_datetime(filename)
     if rec_dt:
-        print(f"  Recorded: {rec_dt:%Y-%m-%d %H:%M}")
+        log.info(f"  Recorded: {rec_dt:%Y-%m-%d %H:%M}")
         ts = rec_dt.strftime("%Y%m%d-%H%M%S")
     else:
-        print("  Warning: could not parse timestamp")
+        log.warning("  Could not parse timestamp")
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     # 4. Create session dir
     session_dir = RECORDINGS_DIR / f"capture-{ts}"
     session_dir.mkdir(parents=True, exist_ok=True)
-    print(f"  Session: {session_dir}")
+    log.info(f"  Session: {session_dir}")
+
+    fh = logging.FileHandler(session_dir / "capture.log")
+    fh.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s"
+        )
+    )
+    log.addHandler(fh)
 
     # 5. Download audio
-    print()
-    print("Downloading audio...")
+    log.info("Downloading audio...")
     audio_path = download_file(
         dl_url, session_dir / filename
     )
-    print(f"  Saved: {audio_path.name}")
+    log.info(f"  Saved: {audio_path.name}")
 
     # 6. Transcribe
-    print()
-    print("Transcribing...")
+    log.info("Transcribing...")
     from recorder.transcribe import transcribe_monologue
 
     transcribe_monologue(session_dir, filename)
@@ -319,30 +328,28 @@ def cmd_process(args: argparse.Namespace) -> None:
     if not args.skip_summary:
         transcript = session_dir / TRANSCRIPT_FILE
         if transcript.exists():
-            print()
-            print("Summarising...")
+            log.info("Summarising...")
             from recorder.summarise import summarise
 
             summarise(transcript)
     else:
-        print()
-        print("Skipped summary (--skip-summary).")
+        log.info("Skipped summary (--skip-summary).")
 
     # 8. Update Notion page
     if not args.skip_notion:
-        print()
-        print("Updating Notion page...")
+        log.info("Updating Notion page...")
         from recorder._notion_update import (
             update_notion_page,
         )
 
         update_notion_page(page_id, session_dir, rec_dt)
     else:
-        print()
-        print("Skipped Notion update (--skip-notion).")
+        log.info("Skipped Notion update (--skip-notion).")
 
-    print()
-    print(f"All output in: {session_dir}")
+    log.removeHandler(fh)
+    fh.close()
+
+    log.info(f"All output in: {session_dir}")
 
 
 def main() -> None:
@@ -350,7 +357,8 @@ def main() -> None:
         prog="capture",
         description=(
             "Record meetings (mic + system audio), then "
-            "transcribe, summarise, compress, and push to Notion."
+            "transcribe, summarise, compress, and push to "
+            "Notion."
         ),
     )
     sub = parser.add_subparsers(dest="command")
@@ -362,7 +370,9 @@ def main() -> None:
 
     sub.add_parser(
         "status",
-        help="Show active recording duration and process info",
+        help=(
+            "Show active recording duration and process info"
+        ),
     )
 
     p_stop = sub.add_parser(
@@ -371,14 +381,17 @@ def main() -> None:
         description=(
             "Stop the active recording, then run the full "
             "pipeline: transcribe (whisper.cpp), summarise "
-            "(Claude Haiku), compress WAV→MP3, and push to "
+            "(Claude Haiku), compress WAV->MP3, and push to "
             "Notion."
         ),
     )
     p_stop.add_argument(
         "--skip-summary",
         action="store_true",
-        help="skip AI summarisation (transcript still produced)",
+        help=(
+            "skip AI summarisation "
+            "(transcript still produced)"
+        ),
     )
     p_stop.add_argument(
         "--skip-notion",

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from recorder.lib import load_env, log_error, log_info
+from recorder.lib import load_env, log
 
 NOTION_API_BASE = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
@@ -116,14 +116,14 @@ def fetch_audio_block(page_id: str) -> tuple[str, str]:
 
 def download_file(url: str, dest: Path) -> Path:
     """Stream-download a file to dest. Return saved path."""
-    log_info(f"Downloading to {dest}")
+    log.info(f"Downloading to {dest}")
     with httpx.stream("GET", url, timeout=120) as resp:
         resp.raise_for_status()
         with dest.open("wb") as f:
             for chunk in resp.iter_bytes(chunk_size=8192):
                 f.write(chunk)
     size_mb = dest.stat().st_size / (1024 * 1024)
-    log_info(f"Downloaded {dest.name} ({size_mb:.1f} MB)")
+    log.info(f"Downloaded {dest.name} ({size_mb:.1f} MB)")
     return dest
 
 

@@ -21,9 +21,7 @@ from recorder.lib import (
     TRANSCRIPT_FILE,
     get_notion_database_id,
     load_env,
-    log_error,
-    log_info,
-    log_warn,
+    log,
 )
 
 NOTION_API_URL = "https://api.notion.com/v1/pages"
@@ -53,7 +51,12 @@ def _paragraph_block(text: str) -> dict:
         "object": "block",
         "type": "paragraph",
         "paragraph": {
-            "rich_text": [{"type": "text", "text": {"content": text}}]
+            "rich_text": [
+                {
+                    "type": "text",
+                    "text": {"content": text},
+                }
+            ]
         },
     }
 
@@ -64,13 +67,22 @@ def _heading_block(text: str, level: int = 2) -> dict:
         "object": "block",
         "type": key,
         key: {
-            "rich_text": [{"type": "text", "text": {"content": text}}]
+            "rich_text": [
+                {
+                    "type": "text",
+                    "text": {"content": text},
+                }
+            ]
         },
     }
 
 
 def _divider_block() -> dict:
-    return {"object": "block", "type": "divider", "divider": {}}
+    return {
+        "object": "block",
+        "type": "divider",
+        "divider": {},
+    }
 
 
 def _build_body_blocks(
@@ -92,7 +104,9 @@ def _build_body_blocks(
     return blocks[:100]
 
 
-def _parse_date_from_dirname(session_dir: Path) -> str | None:
+def _parse_date_from_dirname(
+    session_dir: Path,
+) -> str | None:
     """Extract ISO date from session dirname like meeting-20260607-143000."""
     match = re.search(r"(\d{8})-(\d{6})", session_dir.name)
     if not match:
@@ -114,15 +128,9 @@ def push_to_notion(session_dir: Path) -> None:
     database_id = get_notion_database_id()
 
     if not api_key or not database_id:
-        log_warn(
+        log.warning(
             "NOTION_API_KEY or NOTION_DATABASE_ID not set, "
-            "skipping Notion push",
-            tag="notion",
-        )
-        print(
-            "Warning: NOTION_API_KEY or NOTION_DATABASE_ID not "
-            "set — skipping Notion push.",
-            file=sys.stderr,
+            "skipping Notion push"
         )
         return
 
@@ -169,11 +177,19 @@ def push_to_notion(session_dir: Path) -> None:
 
     # Build Notion page payload
     properties: dict = {
-        "Title": {"title": [{"text": {"content": title}}]},
+        "Title": {
+            "title": [{"text": {"content": title}}]
+        },
         "Duration": {"number": duration_mins},
         "Path": {
             "rich_text": [
-                {"text": {"content": str(session_dir.resolve())}}
+                {
+                    "text": {
+                        "content": str(
+                            session_dir.resolve()
+                        )
+                    }
+                }
             ]
         },
     }
@@ -190,9 +206,7 @@ def push_to_notion(session_dir: Path) -> None:
         "children": children,
     }
 
-    log_info(
-        f"Pushing to Notion: {title}", tag="notion"
-    )
+    log.info(f"Pushing to Notion: {title}")
 
     response = httpx.post(
         NOTION_API_URL,
@@ -206,33 +220,24 @@ def push_to_notion(session_dir: Path) -> None:
     )
 
     if response.status_code >= 400:
-        error = response.json().get("message", response.text)
-        log_error(f"Notion API error: {error}", tag="notion")
-        print(
-            f"Warning: Notion push failed: {error}",
-            file=sys.stderr,
+        error = response.json().get(
+            "message", response.text
         )
+        log.error(f"Notion API error: {error}")
         return
 
     page_url = response.json().get("url", "")
-    log_info(f"Notion page created: {page_url}", tag="notion")
-    print(f"Notion page created: {page_url}")
+    log.info(f"Notion page created: {page_url}")
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print(
-            "Usage: notion_push.py <session_dir>",
-            file=sys.stderr,
-        )
+        log.error("Usage: notion_push.py <session_dir>")
         sys.exit(1)
 
     session_dir = Path(sys.argv[1])
     if not session_dir.is_dir():
-        print(
-            f"Error: '{session_dir}' is not a directory.",
-            file=sys.stderr,
-        )
+        log.error(f"'{session_dir}' is not a directory.")
         sys.exit(1)
 
     push_to_notion(session_dir)

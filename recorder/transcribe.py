@@ -23,7 +23,7 @@ from recorder.lib import (
     SCRIPTS_ROOT,
     SYS_FILE,
     TRANSCRIPT_FILE,
-    log_info,
+    log,
 )
 
 TRANSCRIBE_SH = SCRIPTS_ROOT / "transcribe" / "transcribe.sh"
@@ -93,26 +93,19 @@ def transcribe_dialogue(session_dir: Path) -> None:
     transcript = session_dir / TRANSCRIPT_FILE
 
     if not mic_file.exists():
-        print(
-            f"No {MIC_FILE} found in {session_dir}",
-            file=sys.stderr,
-        )
+        log.error(f"No {MIC_FILE} found in {session_dir}")
         sys.exit(1)
 
     if transcript.exists():
-        print(
+        log.info(
             f"Skipping {session_dir.name} (transcript exists)"
         )
         return
 
-    print(f"Transcribing {session_dir.name}...")
-    log_info(f"Transcribing {session_dir}")
+    log.info(f"Transcribing {session_dir.name}...")
 
     if not sys_file.exists():
-        print(
-            f"Warning: no {SYS_FILE} in {session_dir}",
-            file=sys.stderr,
-        )
+        log.error(f"No {SYS_FILE} in {session_dir}")
         sys.exit(1)
 
     mic_segments = transcribe_file(mic_file)
@@ -128,12 +121,7 @@ def transcribe_dialogue(session_dir: Path) -> None:
             f.write(f"{label} {text}\n")
 
     line_count = len(transcript.read_text().splitlines())
-    print(f"Wrote {transcript} ({line_count} lines)")
-    log_info(
-        f"Transcript written: {transcript} "
-        f"({line_count} lines)"
-    )
-
+    log.info(f"Wrote {transcript} ({line_count} lines)")
 
 
 def transcribe_monologue(
@@ -144,20 +132,18 @@ def transcribe_monologue(
     transcript = session_dir / TRANSCRIPT_FILE
 
     if not audio_file.exists():
-        print(
-            f"No {audio_filename} found in {session_dir}",
-            file=sys.stderr,
+        log.error(
+            f"No {audio_filename} found in {session_dir}"
         )
         sys.exit(1)
 
     if transcript.exists():
-        print(
+        log.info(
             f"Skipping {session_dir.name} (transcript exists)"
         )
         return
 
-    print(f"Transcribing {session_dir.name}...")
-    log_info(f"Transcribing {session_dir}")
+    log.info(f"Transcribing {session_dir.name}...")
 
     segments = transcribe_file(audio_file)
 
@@ -166,27 +152,17 @@ def transcribe_monologue(
             f.write(f"{text}\n")
 
     line_count = len(transcript.read_text().splitlines())
-    print(f"Wrote {transcript} ({line_count} lines)")
-    log_info(
-        f"Transcript written: {transcript} "
-        f"({line_count} lines)"
-    )
+    log.info(f"Wrote {transcript} ({line_count} lines)")
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print(
-            "Usage: transcribe.py <session_dir>",
-            file=sys.stderr,
-        )
+        log.error("Usage: transcribe.py <session_dir>")
         sys.exit(1)
 
     session_dir = Path(sys.argv[1])
     if not session_dir.is_dir():
-        print(
-            f"Error: '{session_dir}' is not a directory.",
-            file=sys.stderr,
-        )
+        log.error(f"'{session_dir}' is not a directory.")
         sys.exit(1)
 
     transcribe_dialogue(session_dir)
@@ -194,4 +170,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -17,8 +17,7 @@ from recorder.lib import (
     TITLE_FILE,
     TRANSCRIPT_FILE,
     load_env,
-    log_error,
-    log_info,
+    log,
 )
 from recorder.notion_push import (
     NOTION_VERSION,
@@ -133,9 +132,8 @@ def update_notion_page(
         }
 
     # PATCH page properties
-    log_info(
-        f"Updating Notion page {page_id}: {title}",
-        tag="notion",
+    log.info(
+        f"Updating Notion page {page_id}: {title}"
     )
     resp = httpx.patch(
         f"{NOTION_API_BASE}/pages/{page_id}",
@@ -145,11 +143,9 @@ def update_notion_page(
     )
     if resp.status_code >= 400:
         error = resp.json().get("message", resp.text)
-        log_error(
-            f"Notion page update failed: {error}",
-            tag="notion",
+        log.error(
+            f"Notion page update failed: {error}"
         )
-        print(f"Warning: Notion page update failed: {error}")
         return
 
     # Append body blocks (summary + transcript)
@@ -162,18 +158,12 @@ def update_notion_page(
             timeout=30,
         )
         if resp.status_code >= 400:
-            error = resp.json().get("message", resp.text)
-            log_error(
-                f"Notion block append failed: {error}",
-                tag="notion",
+            error = resp.json().get(
+                "message", resp.text
             )
-            print(
-                f"Warning: Notion block append failed: "
-                f"{error}"
+            log.error(
+                f"Notion block append failed: {error}"
             )
             return
 
-    log_info(
-        f"Notion page updated: {page_id}", tag="notion"
-    )
-    print(f"Notion page updated: {title}")
+    log.info(f"Notion page updated: {title}")

@@ -128,26 +128,20 @@ If either is missing, the Notion push is skipped with a warning
 
 ## Logging
 
-All pipeline components log to the systemd journal via `logger`.
-Use `journalctl` to inspect logs:
+The capture pipeline writes a `capture.log` file inside each
+session directory. The log covers every stage that runs after
+`capture stop` or `capture process` (transcription, summarisation,
+compression, Notion push).
 
 ```bash
-# Pipeline events (start, stop, transcribe, Notion push)
-journalctl -t recorder --since "1 hour ago"
-
-# Whisper transcription (stderr from whisper-cli)
-journalctl -t whisper-ptt --since "1 hour ago"
-
-# Summarisation
-journalctl -t summarise --since "1 hour ago"
-
-# Notion push/update
-journalctl -t notion --since "1 hour ago"
+cat ~/Recordings/capture-20260607-143000/capture.log
 ```
 
-If transcription appears to hang or produces no output, check
-`whisper-ptt` logs first — whisper errors go to the journal,
-not the terminal.
+Whisper transcription logs separately to the systemd journal:
+
+```bash
+journalctl -t whisper-ptt --since "1 hour ago"
+```
 
 ## Cost
 

@@ -19,8 +19,7 @@ from recorder.lib import (
     SUMMARY_MODEL,
     TITLE_FILE,
     load_env,
-    log_error,
-    log_info,
+    log,
 )
 
 SYSTEM_PROMPT = (
@@ -59,20 +58,15 @@ def summarise(transcript_path: Path) -> None:
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        print(
-            "Error: ANTHROPIC_API_KEY is not set.", file=sys.stderr
-        )
-        print(
-            f"Add it to {SCRIPTS_ROOT / '.env'} or export it.",
-            file=sys.stderr,
+        log.error("ANTHROPIC_API_KEY is not set.")
+        log.error(
+            f"Add it to {SCRIPTS_ROOT / '.env'} or export it."
         )
         sys.exit(1)
 
     transcript_content = transcript_path.read_text()
 
-    log_info(
-        f"Summarising {transcript_path.name}", tag="summarise"
-    )
+    log.info(f"Summarising {transcript_path.name}")
 
     response = httpx.post(
         API_URL,
@@ -96,8 +90,7 @@ def summarise(transcript_path: Path) -> None:
 
     error_msg = data.get("error", {}).get("message")
     if error_msg:
-        log_error(f"API error: {error_msg}", tag="summarise")
-        print(f"API error: {error_msg}", file=sys.stderr)
+        log.error(f"API error: {error_msg}")
         sys.exit(1)
 
     content = data.get("content", [])
@@ -106,11 +99,8 @@ def summarise(transcript_path: Path) -> None:
         "null",
         "",
     ):
-        log_error("Empty response from API", tag="summarise")
-        print(
-            "Error: empty response from API.", file=sys.stderr
-        )
-        print(data, file=sys.stderr)
+        log.error("Empty response from API.")
+        log.error(str(data))
         sys.exit(1)
 
     text = content[0]["text"]
@@ -133,30 +123,20 @@ def summarise(transcript_path: Path) -> None:
     if title:
         title_file = session_dir / TITLE_FILE
         title_file.write_text(title + "\n")
-        print(f"Title: {title}")
+        log.info(f"Title: {title}")
 
-    print(summary)
-    print()
-    print(f"Summary written to: {summary_file}")
-    log_info(
-        f"Summary written: {summary_file}", tag="summarise"
-    )
+    log.info(summary)
+    log.info(f"Summary written to: {summary_file}")
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print(
-            "Usage: summarise.py <transcript.txt>",
-            file=sys.stderr,
-        )
+        log.error("Usage: summarise.py <transcript.txt>")
         sys.exit(1)
 
     transcript_path = Path(sys.argv[1])
     if not transcript_path.is_file():
-        print(
-            f"Error: '{transcript_path}' not found.",
-            file=sys.stderr,
-        )
+        log.error(f"'{transcript_path}' not found.")
         sys.exit(1)
 
     summarise(transcript_path)

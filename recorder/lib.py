@@ -1,6 +1,7 @@
 """Shared utilities for the recorder pipeline."""
 
-import subprocess
+import logging
+import sys
 from pathlib import Path
 
 from dotenv import dotenv_values, load_dotenv
@@ -24,6 +25,12 @@ TITLE_FILE = _CONFIG["TITLE_FILE"]
 META_FILE = ".meta"
 ACTIVE_FILE = Path("/tmp/capture.active")
 
+log = logging.getLogger("recorder")
+log.setLevel(logging.DEBUG)
+_stream_handler = logging.StreamHandler(sys.stdout)
+_stream_handler.setFormatter(logging.Formatter("%(message)s"))
+log.addHandler(_stream_handler)
+
 
 def get_notion_database_id() -> str | None:
     """Return NOTION_DATABASE_ID from .env, or None if unset."""
@@ -36,21 +43,3 @@ def get_notion_database_id() -> str | None:
 def load_env() -> None:
     """Load $SCRIPTS_ROOT/.env into os.environ."""
     load_dotenv(SCRIPTS_ROOT / ".env")
-
-
-def log_info(msg: str, tag: str = "recorder") -> None:
-    subprocess.run(["logger", "-t", tag, msg], check=False)
-
-
-def log_warn(msg: str, tag: str = "recorder") -> None:
-    subprocess.run(
-        ["logger", "-p", "user.warning", "-t", tag, msg],
-        check=False,
-    )
-
-
-def log_error(msg: str, tag: str = "recorder") -> None:
-    subprocess.run(
-        ["logger", "-p", "user.err", "-t", tag, msg],
-        check=False,
-    )
