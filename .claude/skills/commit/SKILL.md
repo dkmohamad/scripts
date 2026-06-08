@@ -10,6 +10,10 @@ allowed-tools: Bash(git *)
 !`git diff`
 !`git diff --cached`
 
+## Pre-flight
+
+Run `/lint` first. **Do not commit if any lint check fails.**
+
 ## Instructions
 
 Stage and commit the current changes. Follow these rules strictly:
