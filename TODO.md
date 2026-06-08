@@ -12,6 +12,14 @@ the `preprocess` CLI (`preprocess analyze` / `preprocess clean`).
 WAV recordings are converted to MP3 before archiving/uploading via
 ffmpeg in the capture pipeline.
 
+## Speaker diarization for single-track recordings
+
+`capture process` currently produces plain text with no speaker
+labels. Add diarization (e.g. pyannote-audio or whisper-diarize) to
+detect speaker turns from a single audio stream, so phone recordings
+of calls get `[Speaker 1]` / `[Speaker 2]` labels like dual-track
+recordings do.
+
 ## ~~Notion integration~~ (done)
 
 Completed recordings are pushed to Notion with metadata (date,

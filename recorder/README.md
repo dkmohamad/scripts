@@ -190,6 +190,20 @@ Whisper transcription logs separately to the systemd journal:
 journalctl -t whisper-ptt --since "1 hour ago"
 ```
 
+## Limitations
+
+### No speaker diarization for single-track recordings
+
+`capture process` treats all audio as a monologue — there are no
+speaker labels in the transcript. If the recording contains multiple
+speakers (e.g. a call recorded on a phone lying on the desk), the
+output is plain text with no indication of who said what. Paragraphs
+break on pauses, which often align with speaker turns, but this is
+not guaranteed.
+
+Dual-track recordings (`capture stop`) do get speaker labels because
+each speaker is on a separate audio track (mic vs system audio).
+
 ## Troubleshooting
 
 ### DeepFilterNet clipping warnings
