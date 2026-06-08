@@ -10,15 +10,14 @@ Also supports processing pre-recorded voice notes from Notion.
 Usage:
     capture start
     capture status
-    capture stop [--skip-summary] [--skip-notion] [--keep-wav]
-    capture process <page> [--skip-summary] [--skip-notion]
+    capture stop [--cleanup] [--skip-summary] [--skip-notion] [--keep-wav]
+    capture process <page> [--cleanup] [--skip-summary] [--skip-notion]
 """
 
 import argparse
 import json
 import logging
 import os
-import subprocess
 import sys
 import time
 from datetime import datetime
@@ -41,8 +40,10 @@ from recorder.lib import (
     SYS_FILE,
     TRANSCRIPT_FILE,
     log,
+    run,
 )
 from recorder.notion_push import push_to_notion
+from recorder.preprocess import preprocess as preprocess_audio
 from recorder.summarise import summarise
 from recorder.transcribe import transcribe_dialogue, transcribe_monologue
 
@@ -58,7 +59,7 @@ def _human_duration(secs: int) -> str:
 
 
 def _human_size(path: Path) -> str:
-    result = subprocess.run(
+    result = run(
         ["numfmt", "--to=iec-i", "--suffix=B", str(path.stat().st_size)],
         capture_output=True,
         text=True,
@@ -94,14 +95,47 @@ def _get_active_session() -> Path | None:
     return None
 
 
-def _compress_session(
-    session_dir: Path, keep_wav: bool = False
+def _cleanup_log(fh: logging.FileHandler) -> None:
+    log.removeHandler(fh)
+    fh.close()
+
+
+def _init_session_log(
+    session_dir: Path,
+) -> logging.FileHandler:
+    """Add a file handler for session-level logging."""
+    fh = logging.FileHandler(session_dir / "capture.log")
+    fh.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s"
+        )
+    )
+    log.addHandler(fh)
+    return fh
+
+
+def _stage_summarise(
+    session_dir: Path, *, skip: bool
+) -> None:
+    """Run summarisation if a transcript exists."""
+    if skip:
+        log.info("Skipped summary (--skip-summary).")
+        return
+    transcript = session_dir / TRANSCRIPT_FILE
+    if transcript.exists():
+        log.info("Summarising...")
+        summarise(transcript)
+
+
+def _stage_compress(
+    session_dir: Path, *, keep_wav: bool = False
 ) -> None:
     """Compress WAV files to MP3 after transcription."""
+    log.info("Compressing...")
     cmd = [str(COMPRESS_SCRIPT), str(session_dir)]
     if keep_wav:
         cmd.append("--keep-wav")
-    subprocess.run(cmd, check=False)
+    run(cmd, check=False)
 
 
 def _cmd_start(args: argparse.Namespace) -> None:
@@ -119,7 +153,7 @@ def _cmd_start(args: argparse.Namespace) -> None:
 
     script = RECORDER_DIR / "_record_meeting.sh"
 
-    result = subprocess.run(
+    result = run(
         [
             str(script),
             str(session_dir),
@@ -210,14 +244,6 @@ def _cmd_stop(args: argparse.Namespace) -> None:
     meta = _read_meta(session_dir)
     start = int(meta["START_EPOCH"])
 
-    fh = logging.FileHandler(session_dir / "capture.log")
-    fh.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(message)s"
-        )
-    )
-    log.addHandler(fh)
-
     # Stop ffmpeg processes
     stop_script = RECORDER_DIR / "_stop.sh"
     stop_args = [str(stop_script), meta["MIC_PID"]]
@@ -225,7 +251,7 @@ def _cmd_stop(args: argparse.Namespace) -> None:
     if sys_pid_str:
         stop_args.append(sys_pid_str)
 
-    subprocess.run(stop_args, check=False)
+    run(stop_args, check=False)
 
     now = int(time.time())
     duration = now - start
@@ -246,47 +272,49 @@ def _cmd_stop(args: argparse.Namespace) -> None:
     # Clean up active marker
     ACTIVE_FILE.unlink(missing_ok=True)
 
-    # Transcribe
-    log.info("Transcribing...")
-    transcribe_dialogue(session_dir)
+    fh = _init_session_log(session_dir)
+    try:
+        if args.cleanup:
+            mic_path = session_dir / MIC_FILE
+            if mic_path.exists():
+                log.info("Preprocessing mic audio...")
+                clean = preprocess_audio(mic_path)
+                log.info(f"  Clean: {clean.name}")
 
-    # Summarise
-    if not args.skip_summary:
-        transcript = session_dir / TRANSCRIPT_FILE
-        if transcript.exists():
-            log.info("Summarising...")
-            summarise(transcript)
-    else:
-        log.info("Skipped summary (--skip-summary).")
+        log.info("Transcribing...")
+        transcribe_dialogue(session_dir)
 
-    # Compress WAV to MP3
-    log.info("Compressing...")
-    _compress_session(session_dir, keep_wav=args.keep_wav)
+        _stage_summarise(
+            session_dir, skip=args.skip_summary
+        )
+        _stage_compress(
+            session_dir, keep_wav=args.keep_wav
+        )
 
-    # Push to Notion
-    if not args.skip_notion:
-        log.info("Pushing to Notion...")
-        push_to_notion(session_dir)
-    else:
-        log.info("Skipped Notion push (--skip-notion).")
-
-    log.removeHandler(fh)
-    fh.close()
+        if not args.skip_notion:
+            log.info("Pushing to Notion...")
+            push_to_notion(session_dir)
+        else:
+            log.info(
+                "Skipped Notion push (--skip-notion)."
+            )
+    except Exception:
+        log.exception("Pipeline failed")
+        sys.exit(1)
+    finally:
+        _cleanup_log(fh)
 
     log.info(f"All output in: {session_dir}")
 
 
 def _cmd_process(args: argparse.Namespace) -> None:
-    # 1. Extract page ID
     page_id = extract_page_id(args.page)
     log.info(f"Notion page: {page_id}")
 
-    # 2. Fetch audio block
     log.info("Fetching audio from Notion...")
     dl_url, filename = fetch_audio_block(page_id)
     log.info(f"  Audio: {filename}")
 
-    # 3. Parse recording timestamp from filename
     rec_dt = parse_recording_datetime(filename)
     if rec_dt:
         log.info(f"  Recorded: {rec_dt:%Y-%m-%d %H:%M}")
@@ -295,48 +323,46 @@ def _cmd_process(args: argparse.Namespace) -> None:
         log.warning("  Could not parse timestamp")
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    # 4. Create session dir
     session_dir = RECORDINGS_DIR / f"capture-{ts}"
     session_dir.mkdir(parents=True, exist_ok=True)
     log.info(f"  Session: {session_dir}")
 
-    fh = logging.FileHandler(session_dir / "capture.log")
-    fh.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(message)s"
-        )
-    )
-    log.addHandler(fh)
-
-    # 5. Download audio
     log.info("Downloading audio...")
     audio_path = download_file(
         dl_url, session_dir / filename
     )
     log.info(f"  Saved: {audio_path.name}")
 
-    # 6. Transcribe
-    log.info("Transcribing...")
-    transcribe_monologue(session_dir, filename)
+    fh = _init_session_log(session_dir)
+    try:
+        if args.cleanup:
+            log.info("Preprocessing audio...")
+            clean = preprocess_audio(audio_path)
+            filename = clean.name
+            log.info(f"  Clean: {filename}")
 
-    # 7. Summarise
-    if not args.skip_summary:
-        transcript = session_dir / TRANSCRIPT_FILE
-        if transcript.exists():
-            log.info("Summarising...")
-            summarise(transcript)
-    else:
-        log.info("Skipped summary (--skip-summary).")
+        log.info("Transcribing...")
+        transcribe_monologue(session_dir, filename)
 
-    # 8. Update Notion page
-    if not args.skip_notion:
-        log.info("Updating Notion page...")
-        update_notion_page(page_id, session_dir, rec_dt)
-    else:
-        log.info("Skipped Notion update (--skip-notion).")
+        _stage_summarise(
+            session_dir, skip=args.skip_summary
+        )
+        _stage_compress(session_dir)
 
-    log.removeHandler(fh)
-    fh.close()
+        if not args.skip_notion:
+            log.info("Updating Notion page...")
+            update_notion_page(
+                page_id, session_dir, rec_dt
+            )
+        else:
+            log.info(
+                "Skipped Notion update (--skip-notion)."
+            )
+    except Exception:
+        log.exception("Pipeline failed")
+        sys.exit(1)
+    finally:
+        _cleanup_log(fh)
 
     log.info(f"All output in: {session_dir}")
 
@@ -376,6 +402,11 @@ def main() -> None:
         ),
     )
     p_stop.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="denoise and normalize audio before transcription",
+    )
+    p_stop.add_argument(
         "--skip-summary",
         action="store_true",
         help=(
@@ -408,6 +439,11 @@ def main() -> None:
     p_process.add_argument(
         "page",
         help="Notion page URL or page ID",
+    )
+    p_process.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="denoise and normalize audio before transcription",
     )
     p_process.add_argument(
         "--skip-summary",

@@ -12,6 +12,7 @@ Also supports processing pre-recorded voice notes from Notion
 capture start              # mic + system audio (dual-track)
 capture status             # check recording
 capture stop               # stop + transcribe + summarise + compress + Notion push
+capture stop --cleanup     # denoise + normalize audio before transcription
 capture stop --skip-summary
 capture stop --skip-notion # skip pushing to Notion
 capture stop --keep-wav    # keep original WAV files
@@ -25,6 +26,7 @@ Recordings auto-stop after 90 minutes.
 
 ```bash
 capture process <notion-page-url-or-id>
+capture process <page> --cleanup      # denoise + normalize before transcribing
 capture process <page> --skip-summary
 capture process <page> --skip-notion
 ```
@@ -34,12 +36,52 @@ shared to Notion via the Android share sheet. The command:
 
 1. Downloads the audio attachment from the Notion page
 2. Parses the original recording timestamp from the filename
-3. Transcribes and summarises the audio
-4. Updates the **same** Notion page with the title, date, duration,
+3. *(if `--cleanup`)* Denoises and normalizes audio with DeepFilterNet
+4. Transcribes and summarises the audio
+5. Updates the **same** Notion page with the title, date, duration,
    summary, and full transcript
+
+#### Audio cleanup
+
+Pass `--cleanup` to run the DeepFilterNet denoising pipeline before
+transcription. This is useful for voice notes recorded in noisy
+environments (car, outdoors, etc.) where background noise degrades
+whisper accuracy. The cleanup step:
+
+- Removes background noise with DeepFilterNet (neural speech enhancement)
+- Resamples to 16kHz mono (whisper target format)
+- Applies an 80Hz high-pass filter to cut remaining sub-bass rumble
+- Peak-normalizes to -1 dB
+
+The cleaned file is saved as `<stem>_clean.wav` in the session
+directory. The original recording is kept alongside it.
+
+This adds processing time (~real-time on CPU for a 10-minute file),
+so it is opt-in rather than default.
 
 The session directory uses the original recording timestamp
 (not the current time), e.g. `capture-20260604-123400/`.
+
+## Pipeline stages
+
+Both commands run through the same pipeline; they differ in audio
+source, transcription mode, and Notion operation:
+
+```
+acquire → [cleanup] → transcribe → [summarise] → compress → [notify]
+```
+
+| Stage | `stop` | `process` |
+|-------|--------|-----------|
+| **acquire** | stop ffmpeg, read WAV from disk | download audio from Notion page |
+| **cleanup** | denoise mic.wav (`--cleanup`) | denoise downloaded file (`--cleanup`) |
+| **transcribe** | dialogue (mic + system, speaker labels) | monologue (single file, plain text) |
+| **summarise** | Claude Haiku summary (`--skip-summary` to skip) | same |
+| **compress** | WAV → MP3 (`--keep-wav` to retain) | WAV → MP3 |
+| **notify** | create new Notion page (`--skip-notion`) | update existing Notion page (`--skip-notion`) |
+
+Stages in `[brackets]` are optional. If any stage fails, the full
+traceback is logged to `capture.log` inside the session directory.
 
 ## Output Structure
 
@@ -115,6 +157,7 @@ If either is missing, the Notion push is skipped with a warning
 | Script | Description |
 |--------|-------------|
 | `capture.py` | Main CLI: start/stop/status/process (console script: `capture`) |
+| `preprocess.py` | Denoise + normalize audio (console script: `preprocess`) |
 | `transcribe.py` | Transcribe audio files (dialogue or monologue) |
 | `summarise.py` | Summarise transcript via Anthropic API |
 | `notion_push.py` | Push session to Notion database (new page) |

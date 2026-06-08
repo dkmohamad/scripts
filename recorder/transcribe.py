@@ -25,6 +25,7 @@ from recorder.lib import (
     SYS_FILE,
     TRANSCRIPT_FILE,
     log,
+    run,
 )
 
 TRANSCRIBE_SH = SCRIPTS_ROOT / "transcribe" / "transcribe.sh"
@@ -51,15 +52,21 @@ def transcribe_file(
     """
     csv_path = audio_path.with_suffix(".csv")
 
-    subprocess.run(
-        [
-            str(TRANSCRIBE_SH),
-            "--babel",
-            "--csv",
-            str(audio_path),
-        ],
-        check=True,
-    )
+    try:
+        run(
+            [
+                str(TRANSCRIBE_SH),
+                "--babel",
+                "--csv",
+                str(audio_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        log.exception("whisper failed to transcribe")
+        raise
 
     segments: list[Segment] = []
     with csv_path.open(newline="") as f:
@@ -165,13 +172,14 @@ def main() -> None:
 def _require_files(
     session_dir: Path, *filenames: str
 ) -> list[Path]:
-    """Resolve audio files, exiting if any are missing."""
+    """Resolve audio files, raising if any are missing."""
     paths: list[Path] = []
     for name in filenames:
         p = session_dir / name
         if not p.exists():
-            log.error(f"No {name} found in {session_dir}")
-            sys.exit(1)
+            raise FileNotFoundError(
+                f"No {name} found in {session_dir}"
+            )
         paths.append(p)
     return paths
 

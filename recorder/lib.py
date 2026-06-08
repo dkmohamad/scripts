@@ -1,9 +1,13 @@
 """Shared utilities for the recorder pipeline."""
 
+from __future__ import annotations
+
 import logging
 import os
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from dotenv import dotenv_values, load_dotenv
 
@@ -52,3 +56,16 @@ def get_notion_database_id() -> str | None:
 def load_env() -> None:
     """Load $SCRIPTS_ROOT/.env into os.environ."""
     load_dotenv(SCRIPTS_ROOT / ".env")
+
+
+def run(
+    cmd: list[str], **kwargs: Any
+) -> subprocess.CompletedProcess[str]:
+    """Run a command with stdin closed.
+
+    Thin wrapper around subprocess.run that always passes
+    stdin=DEVNULL so child processes (ffmpeg, deep-filter,
+    etc.) never block waiting for terminal input.
+    """
+    kwargs.setdefault("stdin", subprocess.DEVNULL)
+    return subprocess.run(cmd, **kwargs)
