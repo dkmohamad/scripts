@@ -30,10 +30,13 @@ NOTION_VERSION = "2022-06-28"
 # Notion blocks have a 2000-char limit per rich_text element.
 BLOCK_TEXT_LIMIT = 2000
 
+# Notion API JSON structure — arbitrary nested dicts.
+type NotionBlock = dict[str, object]
+
 
 def _chunk_text(text: str) -> list[str]:
     """Split text into chunks that fit Notion's block limit."""
-    chunks = []
+    chunks: list[str] = []
     while len(text) > BLOCK_TEXT_LIMIT:
         # Try to break at a newline
         idx = text.rfind("\n", 0, BLOCK_TEXT_LIMIT)
@@ -46,7 +49,7 @@ def _chunk_text(text: str) -> list[str]:
     return chunks
 
 
-def _paragraph_block(text: str) -> dict:
+def _paragraph_block(text: str) -> NotionBlock:
     return {
         "object": "block",
         "type": "paragraph",
@@ -61,7 +64,7 @@ def _paragraph_block(text: str) -> dict:
     }
 
 
-def _heading_block(text: str, level: int = 2) -> dict:
+def _heading_block(text: str, level: int = 2) -> NotionBlock:
     key = f"heading_{level}"
     return {
         "object": "block",
@@ -77,7 +80,7 @@ def _heading_block(text: str, level: int = 2) -> dict:
     }
 
 
-def _divider_block() -> dict:
+def _divider_block() -> NotionBlock:
     return {
         "object": "block",
         "type": "divider",
@@ -87,9 +90,9 @@ def _divider_block() -> dict:
 
 def _build_body_blocks(
     summary: str, transcript: str
-) -> list[dict]:
+) -> list[NotionBlock]:
     """Build Notion block children from summary + transcript."""
-    blocks: list[dict] = []
+    blocks: list[NotionBlock] = []
 
     blocks.append(_heading_block("Summary"))
     for chunk in _chunk_text(summary):
@@ -176,7 +179,7 @@ def push_to_notion(session_dir: Path) -> None:
     date_str = _parse_date_from_dirname(session_dir)
 
     # Build Notion page payload
-    properties: dict = {
+    properties: dict[str, object] = {
         "Title": {
             "title": [{"text": {"content": title}}]
         },
@@ -200,7 +203,7 @@ def push_to_notion(session_dir: Path) -> None:
 
     children = _build_body_blocks(summary, transcript)
 
-    payload = {
+    payload: dict[str, object] = {
         "parent": {"database_id": database_id},
         "properties": properties,
         "children": children,

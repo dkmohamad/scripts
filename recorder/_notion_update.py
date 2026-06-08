@@ -21,7 +21,7 @@ from recorder.lib import (
 )
 from recorder.notion_push import (
     NOTION_VERSION,
-    _build_body_blocks,
+    _build_body_blocks,  # pyright: ignore[reportPrivateUsage]
 )
 
 NOTION_API_BASE = "https://api.notion.com/v1"
@@ -105,7 +105,7 @@ def update_notion_page(
     duration_mins = _get_duration_minutes(session_dir)
 
     # Build properties update
-    properties: dict = {
+    properties: dict[str, object] = {
         "Title": {
             "title": [{"text": {"content": title}}]
         },

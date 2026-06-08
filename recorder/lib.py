@@ -11,17 +11,27 @@ SCRIPTS_ROOT = Path(__file__).resolve().parent.parent
 
 _CONFIG = dotenv_values(Path(__file__).resolve().parent / "config")
 
-SUMMARY_MODEL = _CONFIG["SUMMARY_MODEL"]
-MAX_DURATION_SECS = int(_CONFIG["MAX_DURATION_SECS"])
-RECORDINGS_DIR = Path(_CONFIG["RECORDINGS_DIR"]).expanduser()
-MEETING_PREFIX = _CONFIG["MEETING_PREFIX"]
-MIC_FILE = _CONFIG["MIC_FILE"]
-SYS_FILE = _CONFIG["SYS_FILE"]
-MIC_MP3 = _CONFIG["MIC_MP3"]
-SYS_MP3 = _CONFIG["SYS_MP3"]
-TRANSCRIPT_FILE = _CONFIG["TRANSCRIPT_FILE"]
-SUMMARY_FILE = _CONFIG["SUMMARY_FILE"]
-TITLE_FILE = _CONFIG["TITLE_FILE"]
+
+def _require(key: str) -> str:
+    """Read a required key from the config file."""
+    value = _CONFIG.get(key)
+    if value is None:
+        msg = f"Missing required config key: {key}"
+        raise KeyError(msg)
+    return value
+
+
+SUMMARY_MODEL: str = _require("SUMMARY_MODEL")
+MAX_DURATION_SECS: int = int(_require("MAX_DURATION_SECS"))
+RECORDINGS_DIR: Path = Path(_require("RECORDINGS_DIR")).expanduser()
+MEETING_PREFIX: str = _require("MEETING_PREFIX")
+MIC_FILE: str = _require("MIC_FILE")
+SYS_FILE: str = _require("SYS_FILE")
+MIC_MP3: str = _require("MIC_MP3")
+SYS_MP3: str = _require("SYS_MP3")
+TRANSCRIPT_FILE: str = _require("TRANSCRIPT_FILE")
+SUMMARY_FILE: str = _require("SUMMARY_FILE")
+TITLE_FILE: str = _require("TITLE_FILE")
 META_FILE = ".meta"
 ACTIVE_FILE = Path("/tmp/capture.active")
 

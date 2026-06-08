@@ -107,7 +107,7 @@ def summarise(transcript_path: Path) -> None:
 
     # Parse title from first "# ..." line
     title = ""
-    rest_lines = []
+    rest_lines: list[str] = []
     for i, line in enumerate(text.splitlines()):
         if i == 0 and line.startswith("# "):
             title = line[2:].strip()

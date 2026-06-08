@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false
+# pyright: reportUnknownParameterType=false
+# pyright: reportUnknownArgumentType=false
+# pyright: reportMissingTypeStubs=false
+# pyright: reportMissingTypeArgument=false
+# (evdev has no type stubs — relax unknown-type rules for this file)
 """PTT evdev daemon - push-to-talk via Ctrl+Menu.
 
 Monitors keyboard input devices for Ctrl+Menu press/release events and
@@ -36,9 +43,9 @@ KEY_DOWN = KeyEvent.key_down  # 1
 KEY_UP = KeyEvent.key_up  # 0
 
 
-def find_keyboards():
+def find_keyboards() -> list[InputDevice]:
     """Find all keyboard input devices."""
-    keyboards = []
+    keyboards: list[InputDevice] = []
     for path in evdev.list_devices():
         dev = InputDevice(path)
         caps = dev.capabilities(verbose=False)
@@ -49,7 +56,7 @@ def find_keyboards():
     return keyboards
 
 
-def ptt_start():
+def ptt_start() -> subprocess.Popen[bytes]:
     """Launch ptt-start.sh in the background."""
     return subprocess.Popen(
         [PTT_START],
@@ -60,7 +67,7 @@ def ptt_start():
     )
 
 
-def ptt_stop():
+def ptt_stop() -> None:
     """Launch ptt-stop.sh in the background."""
     subprocess.Popen(
         [PTT_STOP],
@@ -71,21 +78,21 @@ def ptt_stop():
     )
 
 
-def kill_start_proc(proc):
+def kill_start_proc(proc: subprocess.Popen[bytes] | None) -> None:
     """Terminate a running ptt-start.sh process."""
     if proc and proc.poll() is None:
         proc.terminate()
         proc.wait()
 
 
-def monitor(keyboards, test_mode=False):
+def monitor(keyboards: list[InputDevice], test_mode: bool = False) -> None:
     """Monitor keyboards for Ctrl+Menu press/release."""
     ctrl_held = False
     menu_held = False
     combo_active = False
-    start_proc = None
+    start_proc: subprocess.Popen[bytes] | None = None
 
-    def shutdown(*_):
+    def shutdown(*_: object) -> None:
         kill_start_proc(start_proc)
         sys.exit(0)
 
@@ -141,7 +148,7 @@ def monitor(keyboards, test_mode=False):
                         ptt_stop()
 
 
-def main():
+def main() -> None:
     test_mode = "--test" in sys.argv
 
     keyboards = find_keyboards()

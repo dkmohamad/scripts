@@ -56,9 +56,9 @@ def human_size(path: Path) -> str:
     return result.stdout.strip()
 
 
-def read_meta(session_dir: Path) -> dict:
+def read_meta(session_dir: Path) -> dict[str, str]:
     meta_path = session_dir / META_FILE
-    meta: dict = {}
+    meta: dict[str, str] = {}
     for line in meta_path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -68,7 +68,7 @@ def read_meta(session_dir: Path) -> dict:
     return meta
 
 
-def write_meta(session_dir: Path, meta: dict) -> None:
+def write_meta(session_dir: Path, meta: dict[str, str]) -> None:
     meta_path = session_dir / META_FILE
     with meta_path.open("w") as f:
         for key, value in meta.items():

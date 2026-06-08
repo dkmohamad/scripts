@@ -24,18 +24,29 @@ ruff check --fix .
 
 Then re-run `ruff check .` to confirm everything passes.
 
-### 2. ShellCheck (Bash)
+### 2. Pyright (Python type checking)
+
+```bash
+pyright
+```
+
+Warnings are acceptable (e.g. from untyped third-party libraries).
+Only **errors** count as failures.
+
+### 3. ShellCheck (Bash)
 
 ```bash
 git ls-files '*.sh' | xargs shellcheck
 ```
 
-Configuration lives in `.shellcheckrc` at the project root. Both
-tools can be run independently outside of this skill.
+### 4. Report
 
-### 3. Report
+Configuration for each tool lives at the project root
+(`pyproject.toml`, `pyrightconfig.json`, `.shellcheckrc`). All
+tools can be run independently outside of this skill.
 
 Print a summary. If any linter reported errors that could not be
 auto-fixed, list them clearly and do **not** say "lint passed".
 
-Only say "All checks passed" when both ruff and shellcheck exit 0.
+Only say "All checks passed" when ruff, pyright, and shellcheck
+all exit 0.
