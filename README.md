@@ -26,6 +26,7 @@ scripts/
 All tools source `shared/env.sh` which provides:
 
 - **Logging** - `log_info`, `log_warn`, `log_error` write to systemd journal
+- **Recording** - `record_audio`, `stop_recording` (ffmpeg + PulseAudio)
 - **Helpers** - `require_command`, `get_mem_avail`, `get_gpu_mem`
 - **Paths** - `SCRIPTS_ROOT`, `SHARED_DIR`, `VENDOR_DIR`
 
@@ -50,6 +51,12 @@ Copy the environment template and fill in your keys:
 ```bash
 cp .env.template .env
 # Edit .env with your API keys (gitignored, never committed)
+```
+
+### System dependencies
+
+```bash
+sudo apt install ffmpeg pulseaudio-utils
 ```
 
 See individual tool READMEs for setup instructions.

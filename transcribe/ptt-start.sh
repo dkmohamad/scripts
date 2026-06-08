@@ -6,6 +6,7 @@
 # a time due to the exclusive lock.
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+source "$SHARED_DIR/record.sh"
 
 if ! acquire_lock; then
   log_info "START skipped (operation in progress)"
@@ -13,16 +14,19 @@ if ! acquire_lock; then
 fi
 
 # Kill any stray recorder and clean up
-pkill -f "arecord.*whisper_ptt.wav" 2>/dev/null
+if [[ -f "$PIDFILE" ]]; then
+  stop_recording "$(cat "$PIDFILE")"
+  rm -f "$PIDFILE"
+fi
 rm -f "$TMP"
 
 start_timer
 
-# Start recording (max 60s safety limit)
-arecord -q -f S16_LE -r 16000 -c 1 -t wav -d 60 "$TMP" &
-ARECORD_PID=$!
+# Start recording (safety limit from env.sh)
+FFMPEG_PID=$(record_audio "$(pactl get-default-source)" "$TMP" "$MAX_RECORD_SECS")
+echo "$FFMPEG_PID" > "$PIDFILE"
 
-log_info "START pid=$ARECORD_PID"
+log_info "START pid=$FFMPEG_PID"
 
-# Wait for arecord - keeps lock held until ptt-stop kills us
-wait $ARECORD_PID
+# Wait for ffmpeg - keeps lock held until ptt-stop kills us
+wait "$FFMPEG_PID"

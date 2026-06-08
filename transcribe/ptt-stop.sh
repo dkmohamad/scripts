@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # ptt-stop.sh - Stop recording and transcribe
 #
-# Called on hotkey release. Stops arecord, acquires lock, transcribes audio
-# with whisper.cpp, and types the result into the focused window.
+# Called on hotkey release. Stops recording, acquires lock, transcribes
+# audio with whisper.cpp, and types the result into the focused window.
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+source "$SHARED_DIR/record.sh"
 
-# Stop any recording (harmless if not running)
-pkill -f "arecord.*whisper_ptt.wav" 2>/dev/null
-
-# Wait for arecord to finalize WAV header
-sleep 0.2
+# Stop the recording (harmless if not running)
+if [[ -f "$PIDFILE" ]]; then
+  stop_recording "$(cat "$PIDFILE")"
+  rm -f "$PIDFILE"
+fi
 
 # Acquire lock (waits if ptt-start is still cleaning up)
 if ! acquire_lock; then

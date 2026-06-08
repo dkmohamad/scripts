@@ -22,8 +22,10 @@ TMP=/tmp/whisper_ptt.wav
 TMP_TEXT=/tmp/whisper_ptt.txt
 LOCKFILE=/tmp/whisper_ptt.lock
 TIMEFILE=/tmp/whisper_ptt.start
+PIDFILE=/tmp/whisper_ptt.pid
 
 # Timeouts (seconds)
+MAX_RECORD_SECS=120
 WHISPER_TIMEOUT=30
 
 # xdotool typing delay (ms between keystrokes). Higher values prevent crashes
