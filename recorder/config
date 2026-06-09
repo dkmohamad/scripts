@@ -11,4 +11,7 @@ SYS_MP3=system.mp3
 TRANSCRIPT_FILE=transcript.txt
 SUMMARY_FILE=summary.txt
 TITLE_FILE=title.txt
-MERGE_GAP_SECS=3
+# Stitch whisper segments together when the silence between them is shorter
+# than this; break a new line only on a longer pause. 0.7s is the sentence/
+# utterance boundary from Campione & Veronis (2002) pause-duration research.
+MERGE_GAP_SECS=0.7

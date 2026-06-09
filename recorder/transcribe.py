@@ -36,29 +36,33 @@ TRANSCRIBE_SH = SCRIPTS_ROOT / "transcribe" / "transcribe.sh"
 @total_ordering
 @dataclass
 class Segment:
-    """A single transcribed segment."""
+    """A single transcribed segment.
 
-    timestamp: float
+    Times are in seconds: *start* and *end* are the speech boundaries
+    reported by whisper.
+    """
+
+    start: float
+    end: float
     transcript: str
     label: str = ""
 
     def __lt__(self, other: "Segment") -> bool:
-        return self.timestamp < other.timestamp
+        return self.start < other.start
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Segment):
             return NotImplemented
-        return self.timestamp == other.timestamp
+        return self.start == other.start
 
     def __add__(self, other: "Segment") -> "Segment":
         """Combine two segments.
 
-        Averages timestamps and concatenates text.
-        Preserves the subtype of the left operand.
+        Spans from this segment's start to *other*'s end and
+        concatenates text. Preserves the subtype of the left operand.
         """
-        ts = (self.timestamp + other.timestamp) / 2
         text = f"{self.transcript} {other.transcript}"
-        return type(self)(ts, text)
+        return type(self)(self.start, other.end, text)
 
     def __str__(self) -> str:
         if self.label:
@@ -69,8 +73,9 @@ class Segment:
     def from_csv_row(
         cls, row: list[str]
     ) -> "Segment | None":
-        """Parse a CSV row into a Segment.
+        """Parse a whisper ``-ocsv`` row into a Segment.
 
+        Columns are ``start,end,text`` with times in milliseconds.
         Returns None for invalid or empty rows.
         """
         if len(row) < 3:
@@ -80,16 +85,20 @@ class Segment:
         )
         if not text:
             return None
-        return cls(float(row[0]), text)
+        return cls(float(row[0]) / 1000, float(row[1]) / 1000, text)
 
     @classmethod
     def consolidate(
         cls, segments: "list[Segment]", gap: float
     ) -> "list[Segment]":
-        """Consolidate segments closer than *gap* seconds.
+        """Merge segments separated by less than *gap* seconds of silence.
 
-        All segments must match *cls*.  Raises TypeError
-        if a segment of a different type is encountered.
+        The silence between two segments is ``next.start - prev.end``.
+        whisper's VAD emits back-to-back segments mid-sentence, so this
+        stitches continuous speech back into sentences and only breaks
+        where the speaker paused for at least *gap* seconds. All segments
+        must match *cls*; raises TypeError if a segment of a different
+        type is encountered.
         """
         if not segments:
             return []
@@ -101,7 +110,7 @@ class Segment:
                     f" got {type(seg).__name__}"
                 )
         for seg in segments[1:]:
-            if seg.timestamp - merged[-1].timestamp <= gap:
+            if seg.start - merged[-1].end < gap:
                 merged[-1] = merged[-1] + seg
             else:
                 merged.append(seg)
@@ -120,6 +129,20 @@ class ThemSegment(Segment):
     """A segment spoken by them (system track)."""
 
     label: str = "Them"
+
+
+def segments_from_csv(csv_path: Path) -> list[Segment]:
+    """Parse a whisper ``-ocsv`` file into Segments sorted by start time."""
+    segments: list[Segment] = []
+    with csv_path.open(newline="") as f:
+        reader = csv.reader(f)
+        next(reader, None)  # skip header
+        for row in reader:
+            seg = Segment.from_csv_row(row)
+            if seg is not None:
+                segments.append(seg)
+    segments.sort()
+    return segments
 
 
 def transcribe_file(
@@ -148,17 +171,8 @@ def transcribe_file(
         log.exception("whisper failed to transcribe")
         raise
 
-    segments: list[Segment] = []
-    with csv_path.open(newline="") as f:
-        reader = csv.reader(f)
-        next(reader, None)  # skip header
-        for row in reader:
-            seg = Segment.from_csv_row(row)
-            if seg is not None:
-                segments.append(seg)
-
+    segments = segments_from_csv(csv_path)
     csv_path.unlink(missing_ok=True)
-    segments.sort()
     return segments
 
 
@@ -190,14 +204,14 @@ def transcribe_dialogue(session_dir: Path) -> None:
 
     mic = YouSegment.consolidate(
         [
-            YouSegment(s.timestamp, s.transcript)
+            YouSegment(s.start, s.end, s.transcript)
             for s in transcribe_file(mic_file)
         ],
         MERGE_GAP_SECS,
     )
     sys_ = ThemSegment.consolidate(
         [
-            ThemSegment(s.timestamp, s.transcript)
+            ThemSegment(s.start, s.end, s.transcript)
             for s in transcribe_file(sys_file)
         ],
         MERGE_GAP_SECS,
