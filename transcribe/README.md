@@ -62,23 +62,38 @@ Verify after re-login:
 groups | grep input
 ```
 
-### 5. Start the PTT daemon
+### 5. Disable the old xbindkeys hotkey
+
+> **Important:** PTT was previously driven by `xbindkeys`. The evdev daemon
+> replaces it. If `xbindkeys` is still bound to `Ctrl+Menu` it will run
+> *alongside* the daemon and fire `ptt-start.sh` on every key-repeat,
+> fighting the daemon over the lock and producing empty recordings.
+
+If `~/.xbindkeysrc` contains only the PTT bindings, just remove it and stop
+the running instance:
+
+```bash
+rm ~/.xbindkeysrc        # or remove only the c:135 / m:0x4 PTT blocks
+pkill -x xbindkeys
+```
+
+xbindkeys is autostarted via `xbindkeys_autostart`, which only launches
+xbindkeys when a config file exists (`/etc/xbindkeysrc`, `~/.xbindkeysrc`,
+or `~/.xbindkeysrc.scm`). With no config present it won't start at login,
+so removing the file is enough — no autostart override needed. If you use
+xbindkeys for other bindings, just delete the PTT entries instead.
+
+### 6. Install and start the PTT service
 
 ```bash
 ./transcribe/ptt-setup.sh
 ```
 
-This kills any stale processes and starts the evdev PTT daemon in
-the background. The daemon monitors all keyboards for Ctrl+Menu
-press/release and calls `ptt-start.sh` / `ptt-stop.sh`.
-
-### 6. Autostart
-
-Add to your desktop session autostart (e.g. `~/.xsessionrc`):
-
-```bash
-/path/to/scripts/transcribe/ptt-setup.sh
-```
+This installs a `ptt-evdev` **systemd user service** (`Restart=always`),
+enables it so it starts automatically at login, and (re)starts it now. The
+daemon monitors all keyboards for Ctrl+Menu press/release and calls
+`ptt-start.sh` / `ptt-stop.sh`. It survives keyboard unplug/re-enumeration
+and resume-from-suspend. No separate autostart entry is needed.
 
 ## Usage
 
@@ -102,11 +117,11 @@ aplay /tmp/whisper_ptt.wav                     # Mic working?
 # Test evdev key detection
 .venv/bin/python transcribe/ptt-evdev.py --test
 
-# Check the daemon is running
-pgrep -f ptt-evdev
+# Check the service is running
+systemctl --user status ptt-evdev
 
-# Restart the daemon
-./transcribe/ptt-setup.sh
+# Restart it
+systemctl --user restart ptt-evdev    # or: ./transcribe/ptt-setup.sh
 ```
 
 **Permission denied on /dev/input:**
@@ -121,9 +136,13 @@ Whisper stderr is logged to the journal. Check for errors:
 journalctl -t whisper-ptt -p err --since "5 min ago"
 ```
 
-**Empty recordings (rapid start/stop in logs):**
+**Empty recordings (rapid start/stop, "operation in progress" / "lock
+timeout" floods in logs):** almost always a second hotkey handler firing
+alongside the daemon. Check that xbindkeys isn't still bound to Ctrl+Menu
+(see setup step 5):
 ```bash
-journalctl -t whisper-ptt -p err --since "5 min ago"
+pgrep -ax xbindkeys                   # should print nothing
+journalctl -t whisper-ptt --since "5 min ago" | grep "START skipped"
 ```
 
 ## Logs
