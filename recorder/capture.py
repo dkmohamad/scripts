@@ -20,6 +20,7 @@ import logging
 import os
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -35,9 +36,8 @@ from recorder.lib import (
     MAX_DURATION_SECS,
     MEETING_PREFIX,
     META_FILE,
-    MIC_FILE,
+    RECORDING_FILE,
     RECORDINGS_DIR,
-    SYS_FILE,
     TRANSCRIPT_FILE,
     log,
     run,
@@ -45,7 +45,7 @@ from recorder.lib import (
 from recorder.notion_push import push_to_notion
 from recorder.preprocess import preprocess as preprocess_audio
 from recorder.summarise import summarise
-from recorder.transcribe import transcribe_dialogue, transcribe_monologue
+from recorder.transcribe import transcribe
 
 RECORDER_DIR = Path(__file__).resolve().parent
 COMPRESS_SCRIPT = RECORDER_DIR / "_compress.sh"
@@ -138,6 +138,41 @@ def _stage_compress(
     run(cmd, check=False)
 
 
+@dataclass(frozen=True)
+class RecorderStatus:
+    """Status of a started recording, reported by _record_meeting.sh on stdout.
+
+    ``mic_pid`` is the single recorder PID (it owns the one mixed recording
+    file). The rest describe the acoustic context the recording is running in.
+    """
+
+    mic_pid: int
+    output_port: str
+    headphones: bool
+    aec: bool
+
+    @classmethod
+    def from_json(cls, raw: str) -> "RecorderStatus":
+        """Parse the script's JSON status line into a typed object.
+
+        Every field is required: the recorder always emits them, so a missing
+        key (or unparseable line) is a broken contract and is raised, not
+        defaulted away.
+        """
+        try:
+            data = json.loads(raw)
+            return cls(
+                mic_pid=int(data["mic_pid"]),
+                output_port=str(data["output_port"]),
+                headphones=bool(data["headphones"]),
+                aec=bool(data["aec"]),
+            )
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"malformed recorder status from _record_meeting.sh: {raw!r}"
+            ) from exc
+
+
 def _cmd_start(args: argparse.Namespace) -> None:
     active = _get_active_session()
     if active is not None:
@@ -170,23 +205,26 @@ def _cmd_start(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    pids = json.loads(result.stdout.strip())
+    status = RecorderStatus.from_json(result.stdout)
 
+    # The single recorder PID (stored as MIC_PID) owns the mixed recording
+    # file; stopping it finalises it.
     meta = {
-        "MIC_PID": str(pids["mic_pid"]),
-        "SYS_PID": str(pids["sys_pid"]),
+        "MIC_PID": str(status.mic_pid),
         "START_EPOCH": str(int(time.time())),
     }
     _write_meta(session_dir, meta)
     ACTIVE_FILE.write_text(str(session_dir))
 
     log.info(f"Recording started: {session_dir.name}")
-    log.info(f"  Session: {session_dir}")
-    log.info(f"  Mic PID: {pids['mic_pid']}")
-    log.info(f"  Sys PID: {pids['sys_pid']}")
+    log.info(f"  Session:      {session_dir}")
+    log.info(f"  Recorder PID: {status.mic_pid}")
     log.info(
-        f"  Max duration: {MAX_DURATION_SECS // 60} min "
-        "(auto-stop)"
+        f"  Output:       {status.output_port} "
+        f"(headphones={status.headphones}, aec={status.aec})"
+    )
+    log.info(
+        f"  Max duration: {MAX_DURATION_SECS // 60} min (auto-stop)"
     )
 
 
@@ -259,10 +297,9 @@ def _cmd_stop(args: argparse.Namespace) -> None:
     log.info("Recording stopped.")
     log.info(f"  Duration: {_human_duration(duration)}")
 
-    for fname in [MIC_FILE, SYS_FILE]:
-        fpath = session_dir / fname
-        if fpath.exists():
-            log.info(f"  {fname}: {_human_size(fpath)}")
+    rec_path = session_dir / RECORDING_FILE
+    if rec_path.exists():
+        log.info(f"  {RECORDING_FILE}: {_human_size(rec_path)}")
 
     log.info(
         f"Recording stopped: {session_dir.name} "
@@ -274,14 +311,13 @@ def _cmd_stop(args: argparse.Namespace) -> None:
 
     fh = _init_session_log(session_dir)
     try:
-        if args.cleanup:
-            mic_path = session_dir / MIC_FILE
-            if mic_path.exists():
-                log.info("Preprocessing mic audio...")
-                preprocess_audio(mic_path)
+        audio_name = RECORDING_FILE
+        if args.cleanup and rec_path.exists():
+            log.info("Preprocessing audio...")
+            audio_name = preprocess_audio(rec_path).name
 
         log.info("Transcribing...")
-        transcribe_dialogue(session_dir)
+        transcribe(session_dir, audio_name)
 
         _stage_summarise(
             session_dir, skip=args.skip_summary
@@ -340,7 +376,7 @@ def _cmd_process(args: argparse.Namespace) -> None:
             filename = clean.name
 
         log.info("Transcribing...")
-        transcribe_monologue(session_dir, filename)
+        transcribe(session_dir, filename)
 
         _stage_summarise(
             session_dir, skip=args.skip_summary

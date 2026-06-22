@@ -31,4 +31,8 @@ for pid in "$@"; do
     wait "$pid" 2>/dev/null || true
 done
 
+# Tear down the echo-canceller enabled by _record_meeting.sh and restore the
+# real default devices. Safe no-op if AEC was never turned on.
+"$SCRIPT_DIR/audio-setup.sh" off
+
 exit $failed

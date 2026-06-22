@@ -30,14 +30,14 @@ SUMMARY_MODEL: str = _require("SUMMARY_MODEL")
 MAX_DURATION_SECS: int = int(_require("MAX_DURATION_SECS"))
 RECORDINGS_DIR: Path = Path(_require("RECORDINGS_DIR")).expanduser()
 MEETING_PREFIX: str = _require("MEETING_PREFIX")
-MIC_FILE: str = _require("MIC_FILE")
-SYS_FILE: str = _require("SYS_FILE")
-MIC_MP3: str = _require("MIC_MP3")
-SYS_MP3: str = _require("SYS_MP3")
+RECORDING_FILE: str = _require("RECORDING_FILE")
 TRANSCRIPT_FILE: str = _require("TRANSCRIPT_FILE")
 SUMMARY_FILE: str = _require("SUMMARY_FILE")
 TITLE_FILE: str = _require("TITLE_FILE")
 MERGE_GAP_SECS: float = float(_require("MERGE_GAP_SECS"))
+SPEECHMATICS_LANG: str = _require("SPEECHMATICS_LANG")
+SPEECHMATICS_OPERATING_POINT: str = _require("SPEECHMATICS_OPERATING_POINT")
+SPEECHMATICS_URL: str = _require("SPEECHMATICS_URL")
 META_FILE = ".meta"
 ACTIVE_FILE = Path("/tmp/capture.active")
 
@@ -52,6 +52,16 @@ def get_notion_database_id() -> str | None:
     """Return NOTION_DATABASE_ID from .env, or None if unset."""
     load_env()
     return os.environ.get("NOTION_DATABASE_ID")
+
+
+def get_speechmatics_key() -> str:
+    """Return SPEECHMATICS_API_KEY from .env, raising if unset."""
+    load_env()
+    key: str | None = os.environ.get("SPEECHMATICS_API_KEY")
+    if not key:
+        msg = "SPEECHMATICS_API_KEY is not set in .env"
+        raise RuntimeError(msg)
+    return key
 
 
 def load_env() -> None:

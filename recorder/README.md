@@ -1,7 +1,8 @@
 # Meeting Recorder
 
-Record calls (mic + system audio), transcribe with whisper.cpp
-(large-v3), and summarise with Claude Haiku 4.5 via the Anthropic API.
+Record calls as a single echo-cancelled mono mix (your mic + the far-end),
+transcribe with Speechmatics (Arabic ASR + speaker diarization), and
+summarise with Claude Haiku 4.5 via the Anthropic API.
 
 Also supports processing pre-recorded voice notes from Notion
 (e.g. recordings made with Google Recorder on a Pixel phone).
@@ -9,13 +10,13 @@ Also supports processing pre-recorded voice notes from Notion
 ## Pipeline
 
 ```bash
-capture start              # mic + system audio (dual-track)
+capture start              # record (mic + far-end) mixed to one mono file
 capture status             # check recording
 capture stop               # stop + transcribe + summarise + compress + Notion push
 capture stop --cleanup     # denoise + normalize audio before transcription
 capture stop --skip-summary
 capture stop --skip-notion # skip pushing to Notion
-capture stop --keep-wav    # keep original WAV files
+capture stop --keep-wav    # keep the original WAV file
 ```
 
 Stopping automatically transcribes, summarises, compresses
@@ -46,10 +47,10 @@ shared to Notion via the Android share sheet. The command:
 Pass `--cleanup` to run the DeepFilterNet denoising pipeline before
 transcription. This is useful for voice notes recorded in noisy
 environments (car, outdoors, etc.) where background noise degrades
-whisper accuracy. The cleanup step:
+transcription accuracy. The cleanup step:
 
 - Removes background noise with DeepFilterNet (neural speech enhancement)
-- Resamples to 16kHz mono (whisper target format)
+- Resamples to 16kHz mono
 - Applies an 80Hz high-pass filter to cut remaining sub-bass rumble
 - Peak-normalizes to -1 dB
 
@@ -78,14 +79,32 @@ you can verify the cleanup improved the signal.
 | Stage | `stop` | `process` |
 |-------|--------|-----------|
 | **acquire** | stop ffmpeg, read WAV from disk | download audio from Notion page |
-| **cleanup** | analyse + denoise mic.wav + analyse (`--cleanup`) | analyse + denoise downloaded file + analyse (`--cleanup`) |
-| **transcribe** | dialogue (mic + system, speaker labels) | monologue (single file, plain text) |
+| **cleanup** | analyse + denoise recording.wav + analyse (`--cleanup`) | analyse + denoise downloaded file + analyse (`--cleanup`) |
+| **transcribe** | one file, speaker-diarized (`Speaker N`) | same |
 | **summarise** | Claude Haiku summary (`--skip-summary` to skip) | same |
 | **compress** | WAV → MP3 (`--keep-wav` to retain) | WAV → MP3 |
 | **notify** | create new Notion page (`--skip-notion`) | update existing Notion page (`--skip-notion`) |
 
 Stages in `[brackets]` are optional. If any stage fails, the full
 traceback is logged to `capture.log` inside the session directory.
+
+## Design notes
+
+The rationale lives in the module docs:
+
+- **One clean mono mix at capture** (`recorder/audio-setup.sh`,
+  `shared/record.sh`). On open speakers the far-end (teacher) bleeds into the
+  webcam mic, so the recorder runs the mic through PipeWire's WebRTC
+  echo-canceller for the duration of a capture — enabled by `capture start`,
+  torn down by `capture stop` — the same AEC a browser applies to its uplink.
+  Your clean mic and the clean far-end are then mixed into a single mono file
+  by one ffmpeg process. Every input — meeting, phone note, call recording —
+  is therefore one audio file, so there is a single transcription path.
+- **Speechmatics for ASR + diarization** (`recorder/stt.py`). Chosen for
+  diacritised Arabic and language-agnostic speaker diarization; whisper.cpp,
+  Google STT, and pyannote/WhisperX were rejected (see the module docstring
+  for why). Speakers come out anonymous (`[Speaker 1]`/`[Speaker 2]`); a
+  single-speaker recording is rendered as plain text.
 
 ## Output Structure
 
@@ -94,14 +113,13 @@ Each recording creates its own session directory:
 ```
 ~/Recordings/
 └── capture-20260607-143000/
-    ├── mic.mp3
-    ├── system.mp3
+    ├── recording.mp3
     ├── transcript.txt
     ├── title.txt
     └── summary.txt
 ```
 
-Use `--keep-wav` to retain original WAV files alongside the MP3s
+Use `--keep-wav` to retain the original WAV alongside the MP3
 (e.g. for re-transcription with different settings).
 
 ## Setup
@@ -110,12 +128,14 @@ Use `--keep-wav` to retain original WAV files alongside the MP3s
 
 - Python 3.12+ with a project-level venv (see root README)
 - `ffmpeg` and PulseAudio utilities for recording
-- whisper.cpp with the `large-v3` model (see `transcribe/README.md`)
-- An Anthropic API key
+- PipeWire with `module-echo-cancel` (WebRTC AEC) for clean mic capture
+- A Speechmatics API key (batch ASR + diarization)
+- An Anthropic API key (summaries)
 
 ```bash
 cp .env.template .env
 # Add your keys to .env:
+#   SPEECHMATICS_API_KEY=...
 #   ANTHROPIC_API_KEY=sk-ant-...
 #   NOTION_API_KEY=ntn_...
 #   NOTION_DATABASE_ID=...
@@ -161,17 +181,19 @@ If either is missing, the Notion push is skipped with a warning
 | Script | Description |
 |--------|-------------|
 | `capture.py` | Main CLI: start/stop/status/process (console script: `capture`) |
+| `stt.py` | Speechmatics batch transcription engine (ASR + diarization) |
+| `transcribe.py` | Diarized (`Speaker N`) or plain transcript from Segments |
 | `preprocess.py` | Denoise + normalize audio (console script: `preprocess`) |
-| `transcribe.py` | Transcribe audio files (dialogue or monologue) |
 | `summarise.py` | Summarise transcript via Anthropic API |
 | `notion_push.py` | Push session to Notion database (new page) |
 | `lib.py` | Shared utilities for Python scripts |
-| `config` | Pipeline configuration (model, filenames) |
+| `config` | Pipeline configuration (models, filenames, Speechmatics) |
+| `audio-setup.sh` | Toggle the WebRTC echo-cancelled mic (run by start/stop) |
+| `_record_meeting.sh` | Internal: record you + far-end mixed to one mono file, with AEC |
+| `_stop.sh` | Internal: stop the recorder + disable AEC |
+| `_compress.sh` | Internal: convert WAV to MP3 |
 | `_notion_fetch.py` | Internal: download audio from a Notion page |
 | `_notion_update.py` | Internal: update an existing Notion page |
-| `_record_meeting.sh` | Internal: launch dual-track ffmpeg |
-| `_stop.sh` | Internal: stop ffmpeg processes |
-| `_compress.sh` | Internal: convert WAV to MP3 |
 
 ## Logging
 
@@ -184,25 +206,23 @@ compression, Notion push).
 cat ~/Recordings/capture-20260607-143000/capture.log
 ```
 
-Whisper transcription logs separately to the systemd journal:
+Recording and echo-cancellation log to the systemd journal under the
+`recorder` tag:
 
 ```bash
-journalctl -t whisper-ptt --since "1 hour ago"
+journalctl -t recorder --since "1 hour ago"
 ```
 
 ## Limitations
 
-### No speaker diarization for single-track recordings
+### Speakers are anonymous
 
-`capture process` treats all audio as a monologue — there are no
-speaker labels in the transcript. If the recording contains multiple
-speakers (e.g. a call recorded on a phone lying on the desk), the
-output is plain text with no indication of who said what. Paragraphs
-break on pauses, which often align with speaker turns, but this is
-not guaranteed.
-
-Dual-track recordings (`capture stop`) do get speaker labels because
-each speaker is on a separate audio track (mic vs system audio).
+Every recording is transcribed as one diarized stream, so speakers are
+labelled `[Speaker 1]` / `[Speaker 2]` (in order of appearance), not by
+name. There is no `[You]`/`[Them]` mapping: the capture is mixed to mono,
+so the separate source tracks that could identify you aren't kept. The
+Claude summary can still attribute roles from context, and a single-speaker
+recording is written as plain text.
 
 ## Troubleshooting
 
@@ -226,5 +246,7 @@ is needed.
 
 ## Cost
 
-The summariser uses the model set in `config` (~$0.007 per
-meeting). It outputs `summary.txt` alongside the transcript.
+- **Transcription**: Speechmatics batch (enhanced) is billed per hour
+  of audio — check your plan.
+- **Summary**: the model set in `config` (~$0.007 per meeting),
+  written to `summary.txt` alongside the transcript.

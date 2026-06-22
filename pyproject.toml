@@ -8,6 +8,7 @@ dependencies = [
     "librosa>=0.10",
     "python-dotenv",
     "soundfile>=0.12",
+    "speechmatics-batch>=0.5.0",
 ]
 
 [project.scripts]
@@ -24,7 +25,7 @@ packages = ["recorder"]
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-extend-exclude = ["vendor"]
+extend-exclude = ["vendor", "typings"]
 
 [tool.ruff.lint]
 select = [
@@ -35,6 +36,7 @@ select = [
     "UP",    # pyupgrade
     "B",     # flake8-bugbear
     "SIM",   # flake8-simplify
+    "T20",   # flake8-print (no stray print() calls)
     "PLC0415", # import not at top of file
     "D100",    # missing docstring in public module
     "D103",    # missing docstring in public function
@@ -45,3 +47,11 @@ convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["recorder"]
+
+[tool.pytest.ini_options]
+testpaths = ["recorder/tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
