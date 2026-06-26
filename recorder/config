@@ -12,6 +12,21 @@ TITLE_FILE=title.txt
 # than this; break a new line only on a longer pause. 0.7s is the sentence/
 # utterance boundary from Campione & Veronis (2002) pause-duration research.
 MERGE_GAP_SECS=0.7
+# Capture devices for the echo-cancelled meeting recording, pinned to this
+# machine's hardware and verified once (find names with `pactl list short
+# sinks` / `... sources`). Required — recording fails loud if either is blank.
+# Headphone output is intentionally unsupported (YAGNI); set OUTPUT_SINK to the
+# headphone sink if you ever switch.
+MIC_DEVICE=alsa_input.usb-046d_HD_Webcam_C615_9D3F4760-00.mono-fallback
+OUTPUT_SINK=alsa_output.pci-0000_0b_00.1.hdmi-stereo
+# Echo-canceller (WebRTC) stream format for the virtual AEC nodes, set
+# explicitly (not inherited from the master device) so the node shape is
+# deterministic. 48000/s16le is the webrtc-native spec; channels = 2 matches a
+# stereo output (HDMI / headphones). Re-run recorder/_aec_loopback_test.sh after
+# changing these to confirm the far-end still reaches the speakers.
+AEC_RATE=48000
+AEC_CHANNELS=2
+AEC_FORMAT=s16le
 # Speechmatics batch STT (Arabic ASR + diarization). The API key lives in .env
 # (SPEECHMATICS_API_KEY), not here. operating_point=enhanced is the accurate
 # (slower) model tier; diarization is language-agnostic.

@@ -25,9 +25,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_TAG="recorder"
 source "$SCRIPT_DIR/../shared/env.sh"
+# Capture-device overrides (MIC_DEVICE / OUTPUT_SINK) live here.
+source "$SCRIPT_DIR/config"
 
+# Fixed module-echo-cancel identifiers (not user config): the virtual node
+# names we pass to load-module, plus the media.name PipeWire assigns the
+# module's own playback stream (which _move_inputs_to must never relocate).
 SOURCE_NAME="echo-cancel-source"
 SINK_NAME="echo-cancel-sink"
+AEC_PLAYBACK_NAME="Echo-Cancel Playback"
 STATE_FILE="${XDG_RUNTIME_DIR:-/tmp}/recorder-aec.state"
 
 # ===== Public commands ======================================================
@@ -41,25 +47,52 @@ cmd_on() {
     if _aec_loaded; then
         log_info "Echo-cancel already loaded; ensuring defaults are set."
     else
+        # Devices and canceller format are pinned in config for this machine
+        # (MIC_DEVICE / OUTPUT_SINK / AEC_*), verified once via
+        # _aec_loopback_test.sh. The format is set explicitly rather than via
+        # use_master_format=1 so the canceller's node shape is deterministic.
+        # (The HDMI-muting bug itself is fixed in _move_inputs_to, which no
+        # longer relocates the module's own playback stream.) Headphones are
+        # intentionally unsupported — set OUTPUT_SINK to the headphone sink if
+        # you ever switch.
+        if [[ -z "$MIC_DEVICE" || -z "$OUTPUT_SINK" ]]; then
+            log_error "MIC_DEVICE and OUTPUT_SINK must be set in recorder/config."
+            exit 1
+        fi
+
+        # Save the real defaults so `off` restores exactly what was there.
         local real_src real_sink
         real_src="$(pactl get-default-source)"
         real_sink="$(pactl get-default-sink)"
         printf 'REAL_SOURCE=%s\nREAL_SINK=%s\n' "$real_src" "$real_sink" \
             >"$STATE_FILE"
 
-        log_info "Loading module-echo-cancel (webrtc): mic=$real_src sink=$real_sink"
+        log_info "Loading module-echo-cancel (webrtc): mic=$MIC_DEVICE sink=$OUTPUT_SINK rate=$AEC_RATE ch=$AEC_CHANNELS fmt=$AEC_FORMAT"
         pactl load-module module-echo-cancel \
             aec_method=webrtc \
             source_name="$SOURCE_NAME" \
             sink_name="$SINK_NAME" \
-            source_master="$real_src" \
-            sink_master="$real_sink" \
-            use_master_format=1 >/dev/null
+            source_master="$MIC_DEVICE" \
+            sink_master="$OUTPUT_SINK" \
+            rate="$AEC_RATE" \
+            channels="$AEC_CHANNELS" \
+            format="$AEC_FORMAT" >/dev/null
     fi
 
     pactl set-default-source "$SOURCE_NAME"
     pactl set-default-sink "$SINK_NAME"
     _move_inputs_to "$SINK_NAME"
+
+    # Basic check only: the canceller's sink must have come up, else tear down
+    # and fail loud rather than hand back a muted default. The full audio
+    # passthrough check lives in recorder/_aec_loopback_test.sh (run it after
+    # changing devices/format in config).
+    if ! pactl list short sinks | awk '{print $2}' | grep -qxF "$SINK_NAME"; then
+        log_error "echo-cancel sink '$SINK_NAME' did not come up; tearing down."
+        cmd_off
+        exit 1
+    fi
+
     log_info "AEC active. Default mic=$SOURCE_NAME, default sink=$SINK_NAME."
 }
 
@@ -135,15 +168,30 @@ _first_real_source() {
         | awk '$2 !~ /echo-cancel/ && $2 !~ /\.monitor$/ { print $2; exit }'
 }
 
-# _move_inputs_to <sink>: move every active playback stream onto <sink>. On
-# `on` this pulls already-playing audio through the canceller so it becomes the
-# reference (streams that started before AEC would otherwise bypass it); on
-# `off` it pushes them back out to the real sink.
+# _move_inputs_to <sink>: move active playback streams onto <sink>, EXCEPT the
+# canceller's own "Echo-Cancel Playback" stream. That stream's job is to carry
+# the far-end to sink_master (the real speakers); moving it onto the echo-cancel
+# sink loops it back and silently mutes output — this was the HDMI-muting bug.
+# On `on` this pulls already-playing app audio through the canceller as its
+# reference; on `off` it pushes apps back out to the real sink.
 _move_inputs_to() {
-    local target="$1" sid
+    local target="$1" sid aec_ids
+    aec_ids=" $(_aec_playback_input_ids | tr '\n' ' ')"
     for sid in $(pactl list sink-inputs short | awk '{print $1}'); do
+        [[ "$aec_ids" == *" $sid "* ]] && continue
         pactl move-sink-input "$sid" "$target" 2>/dev/null || true
     done
+}
+
+# _aec_playback_input_ids: print the pactl sink-input id(s) of the canceller's
+# own playback stream (media.name = AEC_PLAYBACK_NAME), one per line. Empty if
+# AEC is not loaded. _move_inputs_to skips these so it never relocates the
+# stream that feeds the far-end to the real speakers.
+_aec_playback_input_ids() {
+    pactl list sink-inputs | awk -v want="media.name = \"$AEC_PLAYBACK_NAME\"" '
+        /^Sink Input #/ { id = substr($3, 2) }
+        index($0, want) { print id }
+    '
 }
 
 # ===== Entry point ==========================================================

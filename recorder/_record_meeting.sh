@@ -51,7 +51,13 @@ log_info "Output: sink=$default_sink port=$active_port headphones=$headphones"
 # captured through a WebRTC canceller so the far-end (teacher) does not bleed
 # into mic.wav, even on open speakers. _stop.sh turns it back off. We read the
 # capture devices AFTER this, so they resolve to the echo-cancel virtual nodes.
-"$SCRIPT_DIR/audio-setup.sh" on
+# If it fails its own validation/startup checks it has already torn itself
+# down; abort cleanly rather than record against the wrong devices.
+"$SCRIPT_DIR/audio-setup.sh" on || {
+    log_error "Failed to enable echo cancellation."
+    "$SCRIPT_DIR/audio-setup.sh" off
+    exit 1
+}
 
 source_dev="$(pactl get-default-source)"
 sink_dev="$(pactl get-default-sink).monitor"
