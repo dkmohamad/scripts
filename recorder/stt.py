@@ -31,7 +31,7 @@ from speechmatics.batch import (  # pyright: ignore[reportMissingTypeStubs]
 
 from recorder.lib import (
     SPEECHMATICS_LANG,
-    SPEECHMATICS_OPERATING_POINT,
+    SPEECHMATICS_MODEL,
     SPEECHMATICS_URL,
     get_speechmatics_key,
     log,
@@ -53,7 +53,7 @@ async def _transcribe(audio_path: Path) -> str:
         type=JobType.TRANSCRIPTION,
         transcription_config=TranscriptionConfig(
             language=SPEECHMATICS_LANG,
-            model=Model(SPEECHMATICS_OPERATING_POINT),
+            model=Model(SPEECHMATICS_MODEL),
             diarization="speaker",
         ),
     )
