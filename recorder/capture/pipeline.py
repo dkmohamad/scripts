@@ -68,7 +68,7 @@ def run_pipeline(
         proc = proc.advance(Stage.COMPRESSING)
         _compress(session_dir, keep_wav=keep_wav)
 
-        _publish(session_dir, proc, notion_step)
+        proc = _publish(session_dir, proc, notion_step)
     except Exception:
         log.exception("Pipeline failed")
         raise SystemExit(1) from None
@@ -101,14 +101,18 @@ def _compress(session_dir: Path, *, keep_wav: bool) -> None:
 
 def _publish(
     session_dir: Path, proc: ProcessingState, notion_step: NotionStep | None
-) -> None:
-    """Run the injected Notion step, or log that publishing was skipped."""
+) -> ProcessingState:
+    """Publish via the injected Notion step; return the (advanced) state.
+
+    A ``None`` ``notion_step`` skips publishing and returns ``proc`` unchanged.
+    """
     if notion_step is None:
         log.info("Skipped Notion (--skip-notion).")
-        return
-    proc.advance(Stage.NOTION)
+        return proc
+    proc = proc.advance(Stage.NOTION)
     log.info("Publishing to Notion...")
     notion_step(session_dir)
+    return proc
 
 
 def _init_session_log(session_dir: Path) -> logging.FileHandler:
