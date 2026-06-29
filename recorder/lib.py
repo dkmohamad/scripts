@@ -38,9 +38,10 @@ MERGE_GAP_SECS: float = float(_require("MERGE_GAP_SECS"))
 SPEECHMATICS_LANG: str = _require("SPEECHMATICS_LANG")
 SPEECHMATICS_MODEL: str = _require("SPEECHMATICS_MODEL")
 SPEECHMATICS_URL: str = _require("SPEECHMATICS_URL")
+MARKER_DIR: Path = Path(_require("MARKER_DIR")).expanduser()
 META_FILE = ".meta"
-ACTIVE_FILE = Path("/tmp/capture.active")
-PROCESSING_FILE = Path("/tmp/capture.processing")
+ACTIVE_FILE = MARKER_DIR / "capture.active"
+PROCESSING_FILE = MARKER_DIR / "capture.processing"
 
 NOTION_API_BASE = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"

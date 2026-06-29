@@ -3,6 +3,10 @@
 SUMMARY_MODEL=claude-haiku-4-5-20251001
 MAX_DURATION_SECS=5400
 RECORDINGS_DIR=~/Recordings
+# Ephemeral capture-state markers (recording / processing). Read by the separate
+# start/status/stop processes, so it must be a fixed shared location they all
+# agree on (not $TMPDIR, which can differ between shells).
+MARKER_DIR=/tmp
 MEETING_PREFIX=capture
 RECORDING_FILE=recording.wav
 TRANSCRIPT_FILE=transcript.txt
