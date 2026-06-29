@@ -42,6 +42,8 @@ from .state import (
     RecordingState,
 )
 
+__all__ = ["main"]
+
 RECORDER_DIR = Path(__file__).resolve().parent.parent
 
 

@@ -18,6 +18,8 @@ from .client import make_notion_client
 from .page import notion_properties, page_body
 from .ports import NotionApi
 
+__all__ = ["main", "publish_new_page", "update_existing_page"]
+
 _DIRNAME_DT_RE = re.compile(r"(\d{8})-(\d{6})")
 
 

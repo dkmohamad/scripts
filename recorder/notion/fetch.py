@@ -11,6 +11,13 @@ import httpx
 from ..lib import log
 from .ports import NotionApi
 
+__all__ = [
+    "download_file",
+    "extract_page_id",
+    "fetch_audio_block",
+    "parse_recording_datetime",
+]
+
 # Google Recorder filename pattern: D_Mon_at_HH-MM (e.g. "4_Jun_at_12-34"),
 # embedded in a name like "nse-...-4_Jun_at_12-34.m4a.m4a".
 _MONTH_MAP = {

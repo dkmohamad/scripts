@@ -16,6 +16,8 @@ from ..lib import NOTION_API_BASE, NOTION_VERSION, load_env
 from .blocks import NotionBlock
 from .ports import NotionApi
 
+__all__ = ["NotionClient", "make_notion_client"]
+
 _TIMEOUT = 30
 
 

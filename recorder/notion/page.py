@@ -5,6 +5,8 @@ from __future__ import annotations
 from ..session import Session
 from .blocks import NotionBlock, body_blocks
 
+__all__ = ["notion_properties", "page_body"]
+
 
 def notion_properties(session: Session) -> dict[str, object]:
     """Build the Notion page properties for a session.

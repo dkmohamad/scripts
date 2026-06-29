@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = ["NotionBlock", "body_blocks"]
+
 # Notion API JSON structure — arbitrary nested dicts we construct, not inspect.
 type NotionBlock = dict[str, object]
 

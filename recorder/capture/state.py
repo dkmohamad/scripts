@@ -28,6 +28,15 @@ from ..lib import (
     pid_alive,
 )
 
+__all__ = [
+    "CaptureState",
+    "IdleState",
+    "ProcessingState",
+    "RecorderStatus",
+    "RecordingState",
+    "Stage",
+]
+
 
 class Stage(StrEnum):
     """The ordered stages of the post-recording pipeline.

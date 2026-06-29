@@ -15,6 +15,8 @@ from pathlib import Path
 
 from .lib import RECORDING_FILE, TRANSCRIPT_FILE, log
 
+__all__ = ["main", "transcribe"]
+
 
 def transcribe(session_dir: Path, audio_filename: str) -> None:
     """Transcribe one audio file and write its transcript."""

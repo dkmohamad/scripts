@@ -25,6 +25,8 @@ from .lib import (
     log,
 )
 
+__all__ = ["SYSTEM_PROMPT", "main", "summarise"]
+
 SYSTEM_PROMPT = (
     "You are a note-taking assistant. Given a transcript "
     "(which may be a multi-person meeting or a solo voice note), "

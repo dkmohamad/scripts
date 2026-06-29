@@ -15,6 +15,8 @@ from pathlib import Path
 
 from .lib import SUMMARY_FILE, TITLE_FILE, TRANSCRIPT_FILE, run
 
+__all__ = ["Session"]
+
 _DEFAULT_TITLE = "Untitled Recording"
 _AUDIO_SUFFIXES = (".m4a", ".mp3", ".wav", ".ogg", ".opus")
 

@@ -38,6 +38,8 @@ from .lib import (
     log,
 )
 
+__all__ = ["transcribe_audio"]
+
 # How often to log a "still transcribing" heartbeat while the batch job runs.
 # The SDK polls Speechmatics silently, so without this a long job looks hung.
 HEARTBEAT_SECS = 30.0

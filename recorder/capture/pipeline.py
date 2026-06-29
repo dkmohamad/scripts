@@ -18,6 +18,8 @@ from ..summarise import summarise
 from ..transcribe import transcribe
 from .state import ProcessingState, Stage
 
+__all__ = ["NotionStep", "run_pipeline"]
+
 RECORDER_DIR = Path(__file__).resolve().parent.parent
 COMPRESS_SCRIPT = RECORDER_DIR / "_compress.sh"
 

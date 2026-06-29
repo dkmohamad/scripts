@@ -11,6 +11,8 @@ from typing import Any, Protocol
 
 from .blocks import NotionBlock
 
+__all__ = ["NotionApi"]
+
 
 class NotionApi(Protocol):
     """The Notion operations the recorder pipeline needs."""

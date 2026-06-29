@@ -11,6 +11,37 @@ from typing import Any, cast
 
 from dotenv import dotenv_values, load_dotenv
 
+__all__ = [
+    "ACTIVE_FILE",
+    "ANTHROPIC_API_URL",
+    "ANTHROPIC_VERSION",
+    "MARKER_DIR",
+    "MAX_DURATION_SECS",
+    "MEETING_PREFIX",
+    "MERGE_GAP_SECS",
+    "META_FILE",
+    "NOTION_API_BASE",
+    "NOTION_VERSION",
+    "PROCESSING_FILE",
+    "RECORDINGS_DIR",
+    "RECORDING_FILE",
+    "SCRIPTS_ROOT",
+    "SPEECHMATICS_LANG",
+    "SPEECHMATICS_MODEL",
+    "SPEECHMATICS_URL",
+    "SUMMARY_FILE",
+    "SUMMARY_MODEL",
+    "TITLE_FILE",
+    "TRANSCRIPT_FILE",
+    "get_notion_database_id",
+    "get_speechmatics_key",
+    "human_duration",
+    "human_size",
+    "load_env",
+    "pid_alive",
+    "run",
+]
+
 # Project root (parent of recorder/)
 SCRIPTS_ROOT = Path(__file__).resolve().parent.parent
 

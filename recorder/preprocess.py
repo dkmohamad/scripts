@@ -30,6 +30,8 @@ from scipy.signal import butter, sosfilt
 
 from .lib import SCRIPTS_ROOT, log, run
 
+__all__ = ["AudioReport", "analyze", "main", "preprocess"]
+
 DEEP_FILTER_BIN = (
     SCRIPTS_ROOT / "vendor" / "deep-filter" / "deep-filter"
 )
