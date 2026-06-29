@@ -14,14 +14,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-from recorder._notion_fetch import (
-    download_file,
-    extract_page_id,
-    fetch_audio_block,
-    parse_recording_datetime,
-)
-from recorder._notion_update import update_notion_page
-from recorder.capture.pipeline import run_pipeline
+from recorder.capture.pipeline import NotionStep, run_pipeline
 from recorder.capture.state import (
     IdleState,
     ProcessingState,
@@ -33,12 +26,21 @@ from recorder.lib import (
     MEETING_PREFIX,
     RECORDING_FILE,
     RECORDINGS_DIR,
+    get_notion_database_id,
     human_duration,
     human_size,
     log,
     run,
 )
-from recorder.notion_push import push_to_notion
+from recorder.notion import (
+    download_file,
+    extract_page_id,
+    fetch_audio_block,
+    make_notion_client,
+    parse_recording_datetime,
+    publish_new_page,
+    update_existing_page,
+)
 
 RECORDER_DIR = Path(__file__).resolve().parent.parent
 
@@ -205,7 +207,18 @@ def _cmd_stop(args: argparse.Namespace) -> None:
 
     recording.clear()
 
-    notion_step = None if args.skip_notion else push_to_notion
+    notion_step: NotionStep | None = None
+    if not args.skip_notion:
+        database_id = get_notion_database_id()
+        if database_id:
+            notion_step = partial(
+                publish_new_page,
+                client=make_notion_client(),
+                database_id=database_id,
+            )
+        else:
+            log.warning("NOTION_DATABASE_ID not set; skipping Notion push")
+
     run_pipeline(
         recording.session_dir,
         RECORDING_FILE,
@@ -220,8 +233,10 @@ def _cmd_process(args: argparse.Namespace) -> None:
     page_id = extract_page_id(args.page)
     log.info(f"Notion page: {page_id}")
 
+    client = make_notion_client()
+
     log.info("Fetching audio from Notion...")
-    dl_url, filename = fetch_audio_block(page_id)
+    dl_url, filename = fetch_audio_block(client, page_id)
     log.info(f"  Audio: {filename}")
 
     rec_dt = parse_recording_datetime(filename)
@@ -240,10 +255,15 @@ def _cmd_process(args: argparse.Namespace) -> None:
     audio_path = download_file(dl_url, session_dir / filename)
     log.info(f"  Saved: {audio_path.name}")
 
-    notion_step = (
+    notion_step: NotionStep | None = (
         None
         if args.skip_notion
-        else partial(update_notion_page, page_id, rec_dt=rec_dt)
+        else partial(
+            update_existing_page,
+            client=client,
+            page_id=page_id,
+            recorded_at=rec_dt,
+        )
     )
     run_pipeline(
         session_dir,

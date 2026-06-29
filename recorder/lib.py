@@ -42,6 +42,11 @@ META_FILE = ".meta"
 ACTIVE_FILE = Path("/tmp/capture.active")
 PROCESSING_FILE = Path("/tmp/capture.processing")
 
+NOTION_API_BASE = "https://api.notion.com/v1"
+NOTION_VERSION = "2022-06-28"
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_VERSION = "2023-06-01"
+
 log = logging.getLogger("recorder")
 log.setLevel(logging.DEBUG)
 _stream_handler = logging.StreamHandler(sys.stdout)

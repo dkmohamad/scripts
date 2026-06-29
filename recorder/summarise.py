@@ -15,6 +15,8 @@ from pathlib import Path
 import httpx
 
 from recorder.lib import (
+    ANTHROPIC_API_URL,
+    ANTHROPIC_VERSION,
     SCRIPTS_ROOT,
     SUMMARY_FILE,
     SUMMARY_MODEL,
@@ -48,35 +50,39 @@ SYSTEM_PROMPT = (
     "Be concise. Omit filler, small talk, and repeated content."
 )
 
-MODEL = SUMMARY_MODEL
-API_URL = "https://api.anthropic.com/v1/messages"
-
 
 def summarise(transcript_path: Path) -> None:
-    """Summarise a transcript and write the result alongside it."""
+    """Summarise a transcript and write the result alongside it.
+
+    Args:
+        transcript_path: Path to the transcript text file.
+
+    Raises:
+        RuntimeError: If the API key is unset, the API returns an error, or
+            the response is empty. The caller's boundary decides what to do.
+    """
     load_env()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        log.error("ANTHROPIC_API_KEY is not set.")
-        log.error(
-            f"Add it to {SCRIPTS_ROOT / '.env'} or export it."
+        raise RuntimeError(
+            f"ANTHROPIC_API_KEY is not set "
+            f"(add it to {SCRIPTS_ROOT / '.env'} or export it)"
         )
-        sys.exit(1)
 
     transcript_content = transcript_path.read_text()
 
     log.info(f"Summarising {transcript_path.name}")
 
     response = httpx.post(
-        API_URL,
+        ANTHROPIC_API_URL,
         headers={
             "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
+            "anthropic-version": ANTHROPIC_VERSION,
             "content-type": "application/json",
         },
         json={
-            "model": MODEL,
+            "model": SUMMARY_MODEL,
             "max_tokens": 1024,
             "system": SYSTEM_PROMPT,
             "messages": [
@@ -90,22 +96,15 @@ def summarise(transcript_path: Path) -> None:
 
     error_msg = data.get("error", {}).get("message")
     if error_msg:
-        log.error(f"API error: {error_msg}")
-        sys.exit(1)
+        raise RuntimeError(f"Anthropic API error: {error_msg}")
 
     content = data.get("content", [])
-    if not content or content[0].get("text") in (
-        None,
-        "null",
-        "",
-    ):
-        log.error("Empty response from API.")
-        log.error(str(data))
-        sys.exit(1)
+    if not content or content[0].get("text") in (None, "null", ""):
+        raise RuntimeError(f"Empty response from Anthropic API: {data}")
 
     text = content[0]["text"]
 
-    # Parse title from first "# ..." line
+    # Parse title from the first "# ..." line.
     title = ""
     rest_lines: list[str] = []
     for i, line in enumerate(text.splitlines()):
@@ -130,7 +129,7 @@ def summarise(transcript_path: Path) -> None:
 
 
 def main() -> None:
-    """CLI entry point for summarise."""
+    """CLI entry point for summarise — the resilience boundary."""
     if len(sys.argv) < 2:
         log.error("Usage: summarise.py <transcript.txt>")
         sys.exit(1)
@@ -140,7 +139,11 @@ def main() -> None:
         log.error(f"'{transcript_path}' not found.")
         sys.exit(1)
 
-    summarise(transcript_path)
+    try:
+        summarise(transcript_path)
+    except RuntimeError as exc:
+        log.error(str(exc))
+        sys.exit(1)
 
 
 if __name__ == "__main__":
