@@ -9,6 +9,12 @@ Usage:
     preprocess clean <file> [-o output]
 """
 
+# pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
+# This module interfaces with librosa/scipy/soundfile, which ship no or only
+# partial type information. Silence the "unknown type" / missing-stub family
+# here while real type mismatches (reportArgumentType / reportReturnType) stay
+# enforced.
+
 import argparse
 import functools
 import sys
@@ -128,6 +134,7 @@ def preprocess(
 
         # 2. Load denoised audio at 16kHz mono (whisper target)
         y, sr = librosa.load(str(denoised), sr=16000, mono=True)
+        sr = int(sr)
 
     # 3. High-pass filter at 80 Hz
     y = _highpass(y, sr)
@@ -242,7 +249,7 @@ def _highpass(
 ) -> np.ndarray:
     """Apply a 4th-order Butterworth high-pass filter."""
     sos = butter(4, cutoff, btype="high", fs=sr, output="sos")
-    return sosfilt(sos, y)
+    return np.asarray(sosfilt(sos, y))
 
 
 def _peak_normalize(

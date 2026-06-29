@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from dotenv import dotenv_values, load_dotenv
 
@@ -85,7 +85,9 @@ def run(
     etc.) never block waiting for terminal input.
     """
     kwargs.setdefault("stdin", subprocess.DEVNULL)
-    return subprocess.run(cmd, **kwargs)
+    return cast(
+        "subprocess.CompletedProcess[str]", subprocess.run(cmd, **kwargs)
+    )
 
 
 def pid_alive(pid: int) -> bool:
