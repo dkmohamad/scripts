@@ -127,7 +127,6 @@ class RecordingState(CaptureState):
     session_dir: Path
     mic_pid: int
     start_epoch: int
-    sys_pid: int | None
 
     @classmethod
     def begin(
@@ -142,7 +141,6 @@ class RecordingState(CaptureState):
             session_dir=session_dir,
             mic_pid=status.mic_pid,
             start_epoch=int(time.time()),
-            sys_pid=None,
         )
         _write_meta(
             session_dir,
@@ -160,12 +158,10 @@ class RecordingState(CaptureState):
         if session_dir is None:
             return None
         meta = _read_meta(session_dir)
-        sys_pid = meta.get("SYS_PID", "")
         return cls(
             session_dir=session_dir,
             mic_pid=int(meta["MIC_PID"]),
             start_epoch=int(meta["START_EPOCH"]),
-            sys_pid=int(sys_pid) if sys_pid else None,
         )
 
     def clear(self) -> None:
@@ -180,10 +176,6 @@ class RecordingState(CaptureState):
             f"  Session: {self.session_dir}",
             f"  Mic:     pid {self.mic_pid} ({mic_alive})",
         ]
-        if self.sys_pid is not None:
-            sys_alive = "running" if pid_alive(self.sys_pid) else "dead"
-            lines.append(f"  System:  pid {self.sys_pid} ({sys_alive})")
-
         remaining = MAX_DURATION_SECS - duration
         if remaining > 0:
             lines.append(f"  Auto-stop in: {human_duration(remaining)}")

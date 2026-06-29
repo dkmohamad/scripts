@@ -189,10 +189,7 @@ def _cmd_stop(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     stop_script = RECORDER_DIR / "_stop.sh"
-    stop_args = [str(stop_script), str(recording.mic_pid)]
-    if recording.sys_pid is not None:
-        stop_args.append(str(recording.sys_pid))
-    run(stop_args, check=False)
+    run([str(stop_script), str(recording.mic_pid)], check=False)
 
     duration = int(time.time()) - recording.start_epoch
     log.info("Recording stopped.")
