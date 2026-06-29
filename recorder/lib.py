@@ -40,6 +40,7 @@ SPEECHMATICS_MODEL: str = _require("SPEECHMATICS_MODEL")
 SPEECHMATICS_URL: str = _require("SPEECHMATICS_URL")
 META_FILE = ".meta"
 ACTIVE_FILE = Path("/tmp/capture.active")
+PROCESSING_FILE = Path("/tmp/capture.processing")
 
 log = logging.getLogger("recorder")
 log.setLevel(logging.DEBUG)
@@ -80,3 +81,30 @@ def run(
     """
     kwargs.setdefault("stdin", subprocess.DEVNULL)
     return subprocess.run(cmd, **kwargs)
+
+
+def pid_alive(pid: int) -> bool:
+    """Return True if a signal can be sent to ``pid`` (i.e. it is running)."""
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
+
+
+def human_duration(secs: int) -> str:
+    """Format a duration in seconds as ``HH:MM:SS``."""
+    h = secs // 3600
+    m = (secs % 3600) // 60
+    s = secs % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def human_size(path: Path) -> str:
+    """Format a file's size as a human-readable IEC string (e.g. ``1.2MiB``)."""
+    result = run(
+        ["numfmt", "--to=iec-i", "--suffix=B", str(path.stat().st_size)],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
