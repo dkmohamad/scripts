@@ -44,7 +44,7 @@ from .state import (
 
 __all__ = ["main"]
 
-RECORDER_DIR = Path(__file__).resolve().parent.parent
+_RECORDER_DIR = Path(__file__).resolve().parent.parent
 
 
 def main() -> None:
@@ -153,7 +153,7 @@ def _cmd_start(args: argparse.Namespace) -> None:
     session_dir = RECORDINGS_DIR / f"{MEETING_PREFIX}-{ts}"
     session_dir.mkdir(parents=True, exist_ok=True)
 
-    script = RECORDER_DIR / "_record_meeting.sh"
+    script = _RECORDER_DIR / "_record_meeting.sh"
     result = run(
         [str(script), str(session_dir), str(MAX_DURATION_SECS)],
         capture_output=True,
@@ -192,7 +192,7 @@ def _cmd_stop(args: argparse.Namespace) -> None:
         log.error("No recording in progress.")
         sys.exit(1)
 
-    stop_script = RECORDER_DIR / "_stop.sh"
+    stop_script = _RECORDER_DIR / "_stop.sh"
     run([str(stop_script), str(recording.mic_pid)], check=False)
 
     duration = int(time.time()) - recording.start_epoch

@@ -20,8 +20,8 @@ from .state import ProcessingState, Stage
 
 __all__ = ["NotionStep", "run_pipeline"]
 
-RECORDER_DIR = Path(__file__).resolve().parent.parent
-COMPRESS_SCRIPT = RECORDER_DIR / "_compress.sh"
+_RECORDER_DIR = Path(__file__).resolve().parent.parent
+_COMPRESS_SCRIPT = _RECORDER_DIR / "_compress.sh"
 
 # A single-operation port: given the session dir, publish its results to Notion.
 type NotionStep = Callable[[Path], None]
@@ -95,7 +95,7 @@ def _summarise(session_dir: Path, *, skip: bool) -> None:
 def _compress(session_dir: Path, *, keep_wav: bool) -> None:
     """Compress the session's WAV files to MP3."""
     log.info("Compressing...")
-    cmd = [str(COMPRESS_SCRIPT), str(session_dir)]
+    cmd = [str(_COMPRESS_SCRIPT), str(session_dir)]
     if keep_wav:
         cmd.append("--keep-wav")
     run(cmd, check=False)

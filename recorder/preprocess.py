@@ -32,7 +32,7 @@ from .lib import SCRIPTS_ROOT, log, run
 
 __all__ = ["AudioReport", "analyze", "main", "preprocess"]
 
-DEEP_FILTER_BIN = (
+_DEEP_FILTER_BIN = (
     SCRIPTS_ROOT / "vendor" / "deep-filter" / "deep-filter"
 )
 _TO_WAV_SH = SCRIPTS_ROOT / "shared" / "audio.sh"
@@ -217,13 +217,13 @@ def _to_wav(path: Path, out_dir: Path) -> Path:
 
 def _run_deep_filter(input_path: Path, output_dir: Path) -> Path:
     """Run the deep-filter binary and return the output file path."""
-    if not DEEP_FILTER_BIN.exists():
+    if not _DEEP_FILTER_BIN.exists():
         raise FileNotFoundError(
-            f"deep-filter binary not found: {DEEP_FILTER_BIN}"
+            f"deep-filter binary not found: {_DEEP_FILTER_BIN}"
         )
 
     cmd = [
-        str(DEEP_FILTER_BIN),
+        str(_DEEP_FILTER_BIN),
         str(input_path),
         "--output-dir",
         str(output_dir),

@@ -42,7 +42,7 @@ __all__ = ["transcribe_audio"]
 
 # How often to log a "still transcribing" heartbeat while the batch job runs.
 # The SDK polls Speechmatics silently, so without this a long job looks hung.
-HEARTBEAT_SECS = 30.0
+_HEARTBEAT_SECS = 30.0
 
 
 def transcribe_audio(audio_path: Path) -> str:
@@ -59,11 +59,11 @@ async def _heartbeat(job_id: str, start: float) -> None:
 
     ``wait_for_completion`` polls Speechmatics silently, so a long job emits no
     output between submission and result and looks hung. This logs every
-    ``HEARTBEAT_SECS`` until cancelled.
+    ``_HEARTBEAT_SECS`` until cancelled.
     """
     loop = asyncio.get_running_loop()
     while True:
-        await asyncio.sleep(HEARTBEAT_SECS)
+        await asyncio.sleep(_HEARTBEAT_SECS)
         elapsed = int(loop.time() - start)
         log.info(
             f"Speechmatics: still transcribing job {job_id} ({elapsed}s elapsed)"
