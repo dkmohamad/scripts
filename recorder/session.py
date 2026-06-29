@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from recorder.lib import SUMMARY_FILE, TITLE_FILE, TRANSCRIPT_FILE, run
+from .lib import SUMMARY_FILE, TITLE_FILE, TRANSCRIPT_FILE, run
 
 _DEFAULT_TITLE = "Untitled Recording"
 _AUDIO_SUFFIXES = (".m4a", ".mp3", ".wav", ".ogg", ".opus")

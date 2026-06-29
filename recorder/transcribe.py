@@ -13,7 +13,7 @@ Usage:
 import sys
 from pathlib import Path
 
-from recorder.lib import RECORDING_FILE, TRANSCRIPT_FILE, log
+from .lib import RECORDING_FILE, TRANSCRIPT_FILE, log
 
 
 def transcribe(session_dir: Path, audio_filename: str) -> None:
@@ -26,7 +26,7 @@ def transcribe(session_dir: Path, audio_filename: str) -> None:
     log.info(f"Transcribing {session_dir.name}...")
 
     # Lazy import so the heavy SDK only loads when we actually transcribe.
-    from recorder import stt  # noqa: PLC0415
+    from . import stt  # noqa: PLC0415
 
     text = stt.transcribe_audio(audio_file)
     _write_transcript(session_dir, text)

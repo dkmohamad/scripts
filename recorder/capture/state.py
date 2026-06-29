@@ -18,7 +18,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 
-from recorder.lib import (
+from ..lib import (
     ACTIVE_FILE,
     MAX_DURATION_SECS,
     META_FILE,

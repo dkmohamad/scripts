@@ -12,11 +12,11 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from recorder.capture.state import ProcessingState, Stage
-from recorder.lib import TRANSCRIPT_FILE, log, run
-from recorder.preprocess import preprocess as preprocess_audio
-from recorder.summarise import summarise
-from recorder.transcribe import transcribe
+from ..lib import TRANSCRIPT_FILE, log, run
+from ..preprocess import preprocess as preprocess_audio
+from ..summarise import summarise
+from ..transcribe import transcribe
+from .state import ProcessingState, Stage
 
 RECORDER_DIR = Path(__file__).resolve().parent.parent
 COMPRESS_SCRIPT = RECORDER_DIR / "_compress.sh"

@@ -14,14 +14,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-from recorder.capture.pipeline import NotionStep, run_pipeline
-from recorder.capture.state import (
-    IdleState,
-    ProcessingState,
-    RecorderStatus,
-    RecordingState,
-)
-from recorder.lib import (
+from ..lib import (
     MAX_DURATION_SECS,
     MEETING_PREFIX,
     RECORDING_FILE,
@@ -32,7 +25,7 @@ from recorder.lib import (
     log,
     run,
 )
-from recorder.notion import (
+from ..notion import (
     download_file,
     extract_page_id,
     fetch_audio_block,
@@ -40,6 +33,13 @@ from recorder.notion import (
     parse_recording_datetime,
     publish_new_page,
     update_existing_page,
+)
+from .pipeline import NotionStep, run_pipeline
+from .state import (
+    IdleState,
+    ProcessingState,
+    RecorderStatus,
+    RecordingState,
 )
 
 RECORDER_DIR = Path(__file__).resolve().parent.parent

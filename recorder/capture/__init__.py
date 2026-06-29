@@ -5,6 +5,6 @@ Re-exports ``main`` so the ``capture`` console script
 module into this package.
 """
 
-from recorder.capture.cli import main
+from .cli import main
 
 __all__ = ["main"]

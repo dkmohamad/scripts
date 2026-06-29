@@ -28,7 +28,7 @@ import numpy as np
 import soundfile as sf
 from scipy.signal import butter, sosfilt
 
-from recorder.lib import SCRIPTS_ROOT, log, run
+from .lib import SCRIPTS_ROOT, log, run
 
 DEEP_FILTER_BIN = (
     SCRIPTS_ROOT / "vendor" / "deep-filter" / "deep-filter"

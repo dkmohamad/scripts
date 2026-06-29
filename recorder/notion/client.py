@@ -12,9 +12,9 @@ from typing import Any
 
 import httpx
 
-from recorder.lib import NOTION_API_BASE, NOTION_VERSION, load_env
-from recorder.notion.blocks import NotionBlock
-from recorder.notion.ports import NotionApi
+from ..lib import NOTION_API_BASE, NOTION_VERSION, load_env
+from .blocks import NotionBlock
+from .ports import NotionApi
 
 _TIMEOUT = 30
 

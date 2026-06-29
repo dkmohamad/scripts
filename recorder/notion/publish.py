@@ -12,11 +12,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from recorder.lib import get_notion_database_id, log
-from recorder.notion.client import make_notion_client
-from recorder.notion.page import notion_properties, page_body
-from recorder.notion.ports import NotionApi
-from recorder.session import Session
+from ..lib import get_notion_database_id, log
+from ..session import Session
+from .client import make_notion_client
+from .page import notion_properties, page_body
+from .ports import NotionApi
 
 _DIRNAME_DT_RE = re.compile(r"(\d{8})-(\d{6})")
 

@@ -30,7 +30,7 @@ from speechmatics.batch import (  # pyright: ignore[reportMissingTypeStubs]
     TranscriptionConfig,
 )
 
-from recorder.lib import (
+from .lib import (
     SPEECHMATICS_LANG,
     SPEECHMATICS_MODEL,
     SPEECHMATICS_URL,

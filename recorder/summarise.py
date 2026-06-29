@@ -14,7 +14,7 @@ from pathlib import Path
 
 import httpx
 
-from recorder.lib import (
+from .lib import (
     ANTHROPIC_API_URL,
     ANTHROPIC_VERSION,
     SCRIPTS_ROOT,

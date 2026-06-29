@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from recorder.notion.blocks import NotionBlock, body_blocks
-from recorder.session import Session
+from ..session import Session
+from .blocks import NotionBlock, body_blocks
 
 
 def notion_properties(session: Session) -> dict[str, object]:

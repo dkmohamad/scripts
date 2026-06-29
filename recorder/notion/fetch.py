@@ -8,8 +8,8 @@ from pathlib import Path
 
 import httpx
 
-from recorder.lib import log
-from recorder.notion.ports import NotionApi
+from ..lib import log
+from .ports import NotionApi
 
 # Google Recorder filename pattern: D_Mon_at_HH-MM (e.g. "4_Jun_at_12-34"),
 # embedded in a name like "nse-...-4_Jun_at_12-34.m4a.m4a".
