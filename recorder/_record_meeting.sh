@@ -66,12 +66,16 @@ log_info "Starting meeting recording: mic=$source_dev system=$sink_dev"
 
 # Record you + far-end mixed into one mono file in a single ffmpeg process, so
 # both start together and land aligned in the mix. The single PID owns the file.
-rec_pid=$(record_mixed "$source_dev" "$sink_dev" "$rec_file" \
-    "$max_secs" "$session_dir/ffmpeg.log") || {
+# record_mixed writes the PID to a file rather than echoing it for a command
+# substitution to capture (which could hang - see shared/record.sh).
+rec_pidfile="$session_dir/ffmpeg.pid"
+record_mixed "$source_dev" "$sink_dev" "$rec_file" "$rec_pidfile" \
+    "$max_secs" "$session_dir/ffmpeg.log" || {
     echo "Failed to start recording." >&2
     "$SCRIPT_DIR/audio-setup.sh" off
     exit 1
 }
+rec_pid=$(cat "$rec_pidfile")
 
 echo "{\"mic_pid\": $rec_pid,\
  \"output_port\": \"$active_port\", \"headphones\": $headphones, \"aec\": true}"
