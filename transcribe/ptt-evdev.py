@@ -69,6 +69,10 @@ def find_keyboards() -> list[InputDevice]:
         except OSError:
             log.debug(f"skipping {path} (vanished mid-scan)", exc_info=True)
             continue
+        if "ydotool" in dev.name.lower():
+            # ydotool's virtual uinput keyboard types our own transcriptions;
+            # monitoring it would feed the output back into this daemon.
+            continue
         if ecodes.EV_KEY in caps:
             keys = caps[ecodes.EV_KEY]
             if ecodes.KEY_A in keys and ecodes.KEY_Z in keys:

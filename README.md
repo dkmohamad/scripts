@@ -64,7 +64,17 @@ sudo apt install ffmpeg pulseaudio-utils
 The `vendor/` directory contains third-party binaries:
 
 - **whisper.cpp** — speech-to-text (git submodule, built from source)
+- **ydotool** — Wayland keystroke injection for push-to-talk dictation
+  (git submodule, built from source; see [transcribe/](transcribe/))
 - **deep-filter** — DeepFilterNet neural speech enhancement
+
+To build ydotool (client + `ydotoold` daemon):
+
+```bash
+cd vendor/ydotool
+cmake -B build -DBUILD_DOCS=OFF -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+```
 
 To download the deep-filter binary:
 

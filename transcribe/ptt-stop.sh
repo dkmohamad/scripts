@@ -61,7 +61,8 @@ fi
 log_info "WHISPER exit=0 time=${WHISPER_TIME}s"
 
 # Clean up text: strip control chars (Ctrl+C/D/Z, ESC, etc.) that whisper may
-# hallucinate and xdotool would send as keypresses, killing the terminal session
+# hallucinate and the typing tool would send as keypresses, killing the
+# terminal session
 TEXT=$(echo "$RAW" \
   | tr '\n\r\t' ' ' \
   | tr -d '[:cntrl:]' \
@@ -69,10 +70,22 @@ TEXT=$(echo "$RAW" \
   | sed 's/^ *//; s/ *$//')
 
 if [ -n "$TEXT" ]; then
-  # Write to temp file for xdotool (handles special chars like apostrophes)
+  # Write to temp file for the typing tool (handles special chars like
+  # apostrophes)
   printf '%s ' "$TEXT" > "$TMP_TEXT"
-  xdotool type --clearmodifiers --delay "$XDOTOOL_DELAY" --file "$TMP_TEXT"
-  log_info "TYPED chars=${#TEXT}"
+  if type_text "$TMP_TEXT"; then
+    log_info "TYPED chars=${#TEXT}"
+  else
+    TYPE_EXIT=$?
+    # Leave $TMP in place so the failed dictation can be re-transcribed
+    # manually (see README). ptt-start.sh truncates it on the next press.
+    log_error "TYPE failed exit=${TYPE_EXIT} chars=${#TEXT}"
+    exit 1
+  fi
 else
   log_info "TYPED chars=0 (empty)"
 fi
+
+# Typed successfully (or nothing to type) - delete the WAV so a repeated
+# hotkey press can't re-transcribe and re-type stale audio.
+rm -f "$TMP"

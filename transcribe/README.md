@@ -8,6 +8,18 @@ Voice dictation using whisper.cpp with a keyboard hotkey.
 sudo apt install -y build-essential cmake make git alsa-utils xdotool
 ```
 
+Typing is session-aware: `type_text` in `env.sh` picks the tool from
+`XDG_SESSION_TYPE` at runtime and fails loud on anything else.
+
+- **X11**: `xdotool` (XTEST events). The apt package above is enough.
+- **Wayland**: the vendored **ydotool** (kernel-level uinput injection —
+  xdotool's XTEST events never reach native Wayland windows). This needs
+  `ydotool` **built from source** (step 5): the daemon runs `ydotoold`, which
+  holds one persistent uinput keyboard so the compositor enumerates it once.
+  Do **not** use Ubuntu's apt `ydotool` (0.1.8) — it ships no `ydotoold`, and
+  its daemonless mode creates/destroys a virtual keyboard per keystroke faster
+  than GNOME's mutter can enumerate it, so keystrokes land nowhere.
+
 ## Setup
 
 ### 1. Install Python dependencies
@@ -62,7 +74,31 @@ Verify after re-login:
 groups | grep input
 ```
 
-### 5. Disable the old xbindkeys hotkey
+### 5. Build ydotool and grant uinput access (Wayland only)
+
+Build the vendored ydotool client + daemon:
+
+```bash
+cd vendor/ydotool
+cmake -B build -DBUILD_DOCS=OFF -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)      # produces build/ydotool and build/ydotoold
+```
+
+`ydotoold` opens `/dev/uinput`, which is root-only by default. Grant the
+`input` group access (step 4 already put you in it):
+
+```bash
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"' \
+  | sudo tee /etc/udev/rules.d/60-uinput-input-group.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger --sysname-match=uinput
+ls -l /dev/uinput    # should show root:input 0660
+```
+
+`ptt-setup.sh` (step 7) installs `ydotoold` as a systemd **user service**
+(`Restart=always`, socket at `$XDG_RUNTIME_DIR/.ydotool_socket`) and makes
+`ptt-evdev` require it, so the persistent typing device is always up.
+
+### 6. Disable the old xbindkeys hotkey
 
 > **Important:** PTT was previously driven by `xbindkeys`. The evdev daemon
 > replaces it. If `xbindkeys` is still bound to `Ctrl+Menu` it will run
@@ -83,7 +119,7 @@ or `~/.xbindkeysrc.scm`). With no config present it won't start at login,
 so removing the file is enough — no autostart override needed. If you use
 xbindkeys for other bindings, just delete the PTT entries instead.
 
-### 6. Install and start the PTT service
+### 7. Install and start the PTT service
 
 ```bash
 ./transcribe/ptt-setup.sh
@@ -124,6 +160,22 @@ systemctl --user status ptt-evdev
 systemctl --user restart ptt-evdev    # or: ./transcribe/ptt-setup.sh
 ```
 
+**Transcription works but no text is typed (`TYPE failed` in logs):**
+```bash
+echo "$XDG_SESSION_TYPE"                       # wayland or x11?
+```
+On Wayland the typing path is the vendored ydotool + ydotoold:
+```bash
+systemctl --user status ydotoold               # daemon running?
+ls -l "$XDG_RUNTIME_DIR/.ydotool_socket"       # socket present (srw-------)?
+ls -l /dev/uinput                              # must be root:input 0660 (step 5)
+grep ydotoold /sys/class/input/event*/device/name   # persistent device exists?
+```
+If keystrokes land nowhere but `ydotoold` is up, confirm you are running the
+**vendored** client (`vendor/ydotool/build/ydotool`), not the apt `ydotool`
+0.1.8 — the latter ignores the daemon and loses keystrokes to the
+ephemeral-device race (see Requirements).
+
 **Permission denied on /dev/input:**
 ```bash
 groups | grep input     # Are you in the input group?
@@ -139,7 +191,7 @@ journalctl -t whisper-ptt -p err --since "5 min ago"
 **Empty recordings (rapid start/stop, "operation in progress" / "lock
 timeout" floods in logs):** almost always a second hotkey handler firing
 alongside the daemon. Check that xbindkeys isn't still bound to Ctrl+Menu
-(see setup step 5):
+(see setup step 6):
 ```bash
 pgrep -ax xbindkeys                   # should print nothing
 journalctl -t whisper-ptt --since "5 min ago" | grep "START skipped"

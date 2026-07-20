@@ -32,6 +32,27 @@ WHISPER_TIMEOUT=30
 # in some terminal apps (e.g., Claude CLI's React UI with rapid input).
 XDOTOOL_DELAY=5
 
+# ydotool per-key timing (ms), applied as BOTH --key-hold (down->up) and
+# --key-delay (between keys). ydotool defaults each to 20ms, so leaving them
+# unset costs ~40ms/char - the dominant typing latency. The Wayland path uses
+# the vendored ydotool client talking to a persistent ydotoold daemon (see
+# ptt-setup.sh), which holds one long-lived uinput keyboard the compositor
+# enumerates once, so no device-settle delay is needed either. 0 = type as
+# fast as the daemon can inject; raise it only if a target app (e.g. the
+# Claude CLI React UI) drops characters on rapid input.
+YDOTOOL_KEY_DELAY=0
+YDOTOOL_BIN="$VENDOR_DIR/ydotool/build/ydotool"
+YDOTOOLD_BIN="$VENDOR_DIR/ydotool/build/ydotoold"
+
+# Socket shared by the ydotool client and the ydotoold daemon. The daemon unit
+# (ptt-setup.sh) binds it at %t/$YDOTOOL_SOCKET_NAME, where systemd's %t is the
+# user runtime dir - i.e. $XDG_RUNTIME_DIR. Deriving both sides from this one
+# name keeps them from drifting. No /tmp fallback: if XDG_RUNTIME_DIR is unset
+# the socket path won't resolve and type_text fails loud rather than typing
+# into a socket the daemon isn't listening on.
+YDOTOOL_SOCKET_NAME=".ydotool_socket"
+export YDOTOOL_SOCKET="${XDG_RUNTIME_DIR}/${YDOTOOL_SOCKET_NAME}"
+
 # Whisper paths
 WHISPER_BIN="$VENDOR_DIR/whisper.cpp/build/bin/whisper-cli"
 WHISPER_MODEL="$VENDOR_DIR/whisper.cpp/models/ggml-base.en.bin"
@@ -51,6 +72,40 @@ whisper_transcribe_multi() {
         -m "$WHISPER_MODEL_MULTI" -f "$1" -np -nt -sns \
         --language auto -mc 0 \
         --vad -vm "$VAD_MODEL" 2> >(tee >(logger -t "$LOG_TAG" -p user.err) >&2)
+}
+
+# ------------------------------------------------------------------------------
+# Typing
+# ------------------------------------------------------------------------------
+
+# Type the contents of a file into the focused window. Dispatches on session
+# type: xdotool's XTEST events only reach X11/XWayland apps, so Wayland needs
+# ydotool (kernel-level uinput injection). Returns non-zero on unknown session
+# type or tool failure.
+type_text() {
+    local file="$1"
+    case "${XDG_SESSION_TYPE:-}" in
+        wayland)
+            if [[ ! -S "$YDOTOOL_SOCKET" ]]; then
+                log_error "type_text: ydotoold socket missing at \
+'$YDOTOOL_SOCKET' (is ydotoold.service running?)"
+                return 1
+            fi
+            # --escape 0: type text literally (don't interpret backslashes),
+            # matching xdotool's behaviour on the X11 path.
+            "$YDOTOOL_BIN" type --key-hold "$YDOTOOL_KEY_DELAY" \
+                --key-delay "$YDOTOOL_KEY_DELAY" --escape 0 --file "$file"
+            ;;
+        x11)
+            xdotool type --clearmodifiers --delay "$XDOTOOL_DELAY" \
+                --file "$file"
+            ;;
+        *)
+            log_error "type_text: XDG_SESSION_TYPE='${XDG_SESSION_TYPE:-}' \
+(expected wayland|x11)"
+            return 1
+            ;;
+    esac
 }
 
 # ------------------------------------------------------------------------------
