@@ -135,12 +135,15 @@ Use `--keep-wav` to retain the original WAV alongside the MP3
 ```bash
 cp .env.template .env
 # Add your keys to .env:
-#   SPEECHMATICS_API_KEY=...
 #   ANTHROPIC_API_KEY=sk-ant-...
 #   NOTION_API_KEY=ntn_...
 #   NOTION_DATABASE_ID=...
 uv sync
 ```
+
+The Speechmatics key lives outside the repo, in the file named by
+`SPEECHMATICS_KEY_FILE` in [config](config) (default
+`~/.config/speechmatics/api.key`, `chmod 600`), holding just the key.
 
 ### Notion Integration
 

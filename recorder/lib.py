@@ -26,6 +26,7 @@ __all__ = [
     "RECORDINGS_DIR",
     "RECORDING_FILE",
     "SCRIPTS_ROOT",
+    "SPEECHMATICS_KEY_FILE",
     "SPEECHMATICS_LANG",
     "SPEECHMATICS_MODEL",
     "SPEECHMATICS_URL",
@@ -69,6 +70,7 @@ MERGE_GAP_SECS: float = float(_require("MERGE_GAP_SECS"))
 SPEECHMATICS_LANG: str = _require("SPEECHMATICS_LANG")
 SPEECHMATICS_MODEL: str = _require("SPEECHMATICS_MODEL")
 SPEECHMATICS_URL: str = _require("SPEECHMATICS_URL")
+SPEECHMATICS_KEY_FILE: Path = Path(_require("SPEECHMATICS_KEY_FILE")).expanduser()
 MARKER_DIR: Path = Path(_require("MARKER_DIR")).expanduser()
 META_FILE = ".meta"
 ACTIVE_FILE = MARKER_DIR / "capture.active"
@@ -93,11 +95,20 @@ def get_notion_database_id() -> str | None:
 
 
 def get_speechmatics_key() -> str:
-    """Return SPEECHMATICS_API_KEY from .env, raising if unset."""
-    load_env()
-    key: str | None = os.environ.get("SPEECHMATICS_API_KEY")
+    """Return the Speechmatics API key read from SPEECHMATICS_KEY_FILE.
+
+    The file holds the key on its own; surrounding whitespace is stripped.
+
+    Returns:
+        The API key.
+
+    Raises:
+        FileNotFoundError: If the key file does not exist.
+        RuntimeError: If the key file is empty.
+    """
+    key = SPEECHMATICS_KEY_FILE.read_text().strip()
     if not key:
-        msg = "SPEECHMATICS_API_KEY is not set in .env"
+        msg = f"Speechmatics key file is empty: {SPEECHMATICS_KEY_FILE}"
         raise RuntimeError(msg)
     return key
 

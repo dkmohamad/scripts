@@ -31,11 +31,13 @@ OUTPUT_SINK=alsa_output.pci-0000_0b_00.1.hdmi-stereo
 AEC_RATE=48000
 AEC_CHANNELS=2
 AEC_FORMAT=s16le
-# Speechmatics batch STT. The API key lives in .env (SPEECHMATICS_API_KEY), not
-# here. SPEECHMATICS_LANG=ar_en is the Arabic-English bilingual pack: it handles
-# code-switching between the two, which lessons mix freely (plain `ar` drops any
-# English). SPEECHMATICS_MODEL is the accuracy tier: enhanced | standard |
-# melia-1 (melia-1 auto-switches languages). Diarization is set in stt.py.
+# Speechmatics batch STT. The API key lives in SPEECHMATICS_KEY_FILE (outside
+# the repo, chmod 600), not here. SPEECHMATICS_LANG=ar_en is the Arabic-English
+# bilingual pack: it handles code-switching between the two, which lessons mix
+# freely (plain `ar` drops any English). SPEECHMATICS_MODEL is the accuracy
+# tier: enhanced | standard | melia-1 (melia-1 auto-switches languages).
+# Diarization is set in stt.py.
 SPEECHMATICS_LANG=ar_en
 SPEECHMATICS_MODEL=enhanced
 SPEECHMATICS_URL=https://asr.api.speechmatics.com/v2
+SPEECHMATICS_KEY_FILE=~/.config/speechmatics/api.key
