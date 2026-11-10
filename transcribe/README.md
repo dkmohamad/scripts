@@ -141,11 +141,11 @@ and resume-from-suspend. No separate autostart entry is needed.
 
 **No text appears:**
 ```bash
-ls -la /tmp/whisper_ptt.wav                    # Recording exists?
-aplay /tmp/whisper_ptt.wav                     # Mic working?
+ls -la "$XDG_RUNTIME_DIR"/whisper_ptt.wav                    # Recording exists?
+aplay "$XDG_RUNTIME_DIR"/whisper_ptt.wav                     # Mic working?
 ./vendor/whisper.cpp/build/bin/whisper-cli \
   -m vendor/whisper.cpp/models/ggml-base.en.bin \
-  -f /tmp/whisper_ptt.wav                      # Whisper working?
+  -f "$XDG_RUNTIME_DIR"/whisper_ptt.wav                      # Whisper working?
 ```
 
 **Hotkey not triggering:**

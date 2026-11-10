@@ -17,12 +17,16 @@ source "$SHARED_DIR/env.sh"
 # Transcribe-specific constants
 # ------------------------------------------------------------------------------
 
-# Temp files
-TMP=/tmp/whisper_ptt.wav
-TMP_TEXT=/tmp/whisper_ptt.txt
-LOCKFILE=/tmp/whisper_ptt.lock
-TIMEFILE=/tmp/whisper_ptt.start
-PIDFILE=/tmp/whisper_ptt.pid
+# Temp files. They hold the recording and its transcript, so they live in the
+# user's private runtime directory: /tmp is readable by every user on the
+# machine. No fallback: without XDG_RUNTIME_DIR the scripts stop rather than
+# write dictation somewhere shared.
+RUNTIME_DIR="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}"
+TMP="$RUNTIME_DIR/whisper_ptt.wav"
+TMP_TEXT="$RUNTIME_DIR/whisper_ptt.txt"
+LOCKFILE="$RUNTIME_DIR/whisper_ptt.lock"
+TIMEFILE="$RUNTIME_DIR/whisper_ptt.start"
+PIDFILE="$RUNTIME_DIR/whisper_ptt.pid"
 
 # Timeouts (seconds)
 MAX_RECORD_SECS=120
